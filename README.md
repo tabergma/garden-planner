@@ -1,6 +1,7 @@
 Garden Planner
 
 Ein interaktiver Planer, mit dem du dein Gemüse- bzw. Nutzgarten-Beet monatlich planen und verwalten kannst. Du kannst Beete anlegen, Pflanzen definieren, Anbau- und Erntemonate festlegen und daraus automatisch Aufgaben generieren.
+Das ist mein erstes vibe-coded Projekt, für mich zum üben aber auch weil ich diesen Gemüseplaner brauche. 
 
 🚀 Features
 
