@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gartenplaner</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,700;1,300&family=DM+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --soil:#2e1f0e;--soil2:#3d2b14;--paper:#f7f2e8;--paper2:#ede7d5;--paper3:#e0d8c3;
+  --ink:#1a1108;--ink2:#6b5c3e;--green:#4f8a5a;--green2:#7bb87e;
+  --amber:#c4813e;--amber2:#e8b870;--red:#b84040;--border:#c8b990;
+  --r:10px;--shadow:0 4px 24px rgba(30,15,0,.13);
+  --cpix:32;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);overflow:hidden}
+#app{display:grid;grid-template-rows:56px 1fr;height:100vh}
+
+/* HEADER */
+header{background:var(--soil);color:var(--paper2);display:flex;align-items:center;justify-content:space-between;padding:0 24px;gap:12px;z-index:50;box-shadow:0 2px 16px rgba(0,0,0,.35)}
+header h1{font-family:'Fraunces',serif;font-size:1.25rem;white-space:nowrap}
+header h1 em{color:var(--amber2);font-style:italic}
+nav{display:flex;gap:4px}
+.nav-btn{background:transparent;border:none;color:#a89878;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;padding:6px 14px;border-radius:6px;cursor:pointer;transition:all .2s}
+.nav-btn.active,.nav-btn:hover{background:var(--amber);color:#fff}
+
+/* LAYOUT */
+.content{overflow:hidden}
+.panel{display:none;height:100%;overflow:hidden}
+.panel.active{display:flex;flex-direction:column}
+#panel-beete{flex-direction:row!important}
+
+/* SIDEBAR */
+.beet-sidebar{width:250px;min-width:200px;background:var(--soil2);color:var(--paper2);display:flex;flex-direction:column;border-right:2px solid rgba(0,0,0,.2);overflow:hidden}
+.sidebar-head{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sidebar-head h3{font-family:'Fraunces',serif;font-size:1rem}
+.beet-list{flex:1;overflow-y:auto;padding:8px}
+.bli{padding:10px 12px;border-radius:8px;cursor:pointer;transition:background .15s;margin-bottom:3px;display:flex;align-items:center;justify-content:space-between}
+.bli:hover{background:rgba(255,255,255,.08)}.bli.active{background:rgba(255,255,255,.15)}
+.bli-name{font-weight:600;font-size:.88rem}.bli-size{font-size:.72rem;color:#a89878;margin-top:1px}
+.bli-acts{display:flex;gap:3px;opacity:0;transition:opacity .15s}.bli:hover .bli-acts{opacity:1}
+
+/* BEET MAIN */
+.beet-main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.beet-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:var(--ink2);text-align:center;padding:40px}
+.beet-empty .icon{font-size:3rem}
+#beet-view{display:none;flex-direction:column;height:100%;overflow:hidden}
+
+/* MONTH TABS */
+.mtabs-bar{background:var(--paper2);border-bottom:2px solid var(--border);display:flex;align-items:center;padding:0 8px;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.mtabs-bar::-webkit-scrollbar{display:none}
+.mtab{padding:10px 12px;font-size:.75rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;margin-top:2px;color:var(--ink2);transition:all .2s;flex-shrink:0}
+.mtab:hover{color:var(--green)}.mtab.active{color:var(--green);border-bottom-color:var(--green)}
+.mtab.has-p::after{content:'●';font-size:.45rem;vertical-align:super;color:var(--green2);margin-left:2px}
+.mcontrols{margin-left:auto;display:flex;align-items:center;gap:8px;padding-left:10px;flex-shrink:0}
+.play-btn{display:flex;align-items:center;gap:5px;background:var(--green);color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:.75rem;font-weight:600;cursor:pointer;transition:background .2s;white-space:nowrap}
+.play-btn:hover{background:#3a6f44}.play-btn.playing{background:var(--amber)}
+.tline-wrap{height:5px;background:var(--paper3);flex-shrink:0;border-top:1px solid var(--border)}
+.tline-bar{height:100%;background:linear-gradient(90deg,var(--green2),var(--green));transition:width .5s ease;width:0%}
+
+/* CANVAS */
+.canvas-area{flex:1;overflow:auto;padding:24px;
+  background:radial-gradient(circle at 100% 100%,rgba(100,80,40,.04) 0%,transparent 60%),
+  linear-gradient(rgba(180,160,100,.2) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(180,160,100,.2) 1px,transparent 1px),var(--paper);
+  background-size:auto,40px 40px,40px 40px}
+.canvas-wrap{display:inline-block;position:relative;border:2px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:var(--shadow);background:var(--paper);user-select:none}
+.grid-svg{position:absolute;inset:0;pointer-events:none;z-index:1}
+.grid-cells{position:relative;z-index:2}
+
+/* EMPTY CELLS */
+.gcell{position:absolute;cursor:crosshair;z-index:2}
+.gcell-hover{position:absolute;inset:1px;background:rgba(79,138,90,.2);border:1.5px dashed var(--green);border-radius:3px;opacity:0;transition:opacity .15s;pointer-events:none}
+.gcell:hover .gcell-hover{opacity:1}
+
+/* PLANT TILES — multi-cell blocks */
+.ptile{
+  position:absolute;border-radius:6px;z-index:5;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  overflow:visible;cursor:grab;
+  transition:box-shadow .15s, opacity .35s;
+  box-shadow:0 2px 8px rgba(0,0,0,.18);
+}
+.ptile:active{cursor:grabbing}
+.ptile.dragging{opacity:.7;box-shadow:0 8px 28px rgba(0,0,0,.35);z-index:20}
+.ptile-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;padding:2px;position:relative;overflow:hidden;border-radius:6px}
+.ptile-emoji{line-height:1;pointer-events:none}
+.ptile-label{font-size:.58rem;font-weight:700;color:rgba(0,0,0,.7);text-align:center;max-width:90%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;margin-top:1px}
+.ptile-badge{position:absolute;top:3px;right:3px;font-size:.55rem;font-weight:700;padding:1px 4px;border-radius:3px;pointer-events:none}
+.badge-sae{background:#2e7040;color:#fff}
+.badge-pfl{background:#1a5090;color:#fff}
+.badge-ern{background:#8a4520;color:#fff}
+.badge-care{background:#505050;color:#fff}
+
+/* RESIZE HANDLE */
+.ptile-resize{
+  position:absolute;right:0;bottom:0;
+  width:14px;height:14px;cursor:se-resize;z-index:10;
+  display:flex;align-items:flex-end;justify-content:flex-end;
+  padding:2px;
+}
+.ptile-resize::after{content:'';display:block;width:8px;height:8px;border-right:2px solid rgba(0,0,0,.5);border-bottom:2px solid rgba(0,0,0,.5)}
+
+/* TOOLTIP */
+.ptile-tooltip{position:absolute;bottom:calc(100%+5px);left:50%;transform:translateX(-50%);background:var(--soil);color:var(--paper2);font-size:.64rem;padding:4px 9px;border-radius:5px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:30;line-height:1.5}
+.ptile:hover .ptile-tooltip{opacity:1}
+
+/* DRAG GHOST */
+#drag-ghost{position:fixed;pointer-events:none;z-index:1000;border-radius:6px;opacity:.7;box-shadow:0 8px 28px rgba(0,0,0,.35);display:none;align-items:center;justify-content:center}
+
+/* AUFGABEN LEGENDE */
+.aufgaben-legende{
+  display:flex;gap:10px;padding:6px 16px;background:var(--paper2);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;align-items:center;
+}
+.legende-item{display:flex;align-items:center;gap:4px;font-size:.68rem;color:var(--ink2)}
+.legende-dot{width:10px;height:10px;border-radius:2px}
+
+/* PFLANZEN */
+#panel-pflanzen{overflow:hidden}
+.pflanzen-scroll{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px}
+.pflanzen-header{display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.pflanzen-header h2{font-family:'Fraunces',serif;font-size:1.5rem}
+.pflanzen-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.pfl-card{background:var(--paper2);border:1.5px solid var(--border);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px}
+.pfl-card-top{display:flex;align-items:flex-start;justify-content:space-between}
+.pfl-name{font-family:'Fraunces',serif;font-size:1rem;font-weight:700}.pfl-typ{font-size:.72rem;color:var(--ink2);margin-top:2px}.pfl-emoji{font-size:2rem}
+.month-bars{display:flex;gap:2px;align-items:flex-end;height:22px}
+.mbar{flex:1;border-radius:2px;background:var(--paper3);min-height:5px}
+.mbar.a{background:var(--green2)}.mbar.e{background:var(--amber)}.mbar.ae{background:var(--green)}
+
+/* KALENDER */
+#panel-kalender{overflow:hidden}
+.kal-scroll{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:16px}
+.kal-header{display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.kal-header h2{font-family:'Fraunces',serif;font-size:1.5rem}
+.kal-mgroup{background:var(--paper2);border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden}
+.kal-mhead{padding:11px 18px;background:var(--paper3);border-bottom:1.5px solid var(--border);font-family:'Fraunces',serif;font-size:.95rem}
+.kal-entry{padding:11px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+.kal-entry:last-child{border-bottom:none}
+.kal-emoji{font-size:1.3rem;width:28px;text-align:center}.kal-info{flex:1}
+.kal-info h4{font-size:.88rem;font-weight:600}.kal-info p{font-size:.76rem;color:var(--ink2);margin-top:1px}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.68rem;font-weight:600}
+.ts{background:#e0f0e3;color:#2e7040}.tp{background:#e3f0e8;color:#2a6040}
+.te{background:#f5ede0;color:#8a4520}.tpf{background:#e8eaf5;color:#3040a0}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:8px;border:none;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-primary{background:var(--green);color:#fff}.btn-primary:hover{background:#3a6f44}
+.btn-danger{background:var(--red);color:#fff}.btn-danger:hover{background:#8a2828}
+.btn-ghost{background:transparent;color:var(--ink2);border:1.5px solid var(--border)}.btn-ghost:hover{background:var(--paper3)}
+.btn-sm{padding:4px 10px;font-size:.74rem}.btn-icon{padding:4px 7px;border-radius:6px;font-size:.82rem}
+.btn-amber{background:var(--amber);color:#fff;border:none}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(20,10,0,.55);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--paper);border-radius:16px;padding:28px;min-width:340px;max-width:520px;width:92%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 72px rgba(0,0,0,.3);animation:pop .22s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{from{transform:scale(.9) translateY(16px);opacity:0}to{transform:scale(1);opacity:1}}
+.modal h3{font-family:'Fraunces',serif;font-size:1.25rem;margin-bottom:18px}
+.fg{margin-bottom:13px}
+.fg label{display:block;font-size:.73rem;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.fg input,.fg select,.fg textarea{width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.88rem;background:var(--paper2);color:var(--ink);transition:border-color .2s}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--green)}
+.fg textarea{resize:vertical;min-height:65px}
+.fg-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.mpicker{display:grid;grid-template-columns:repeat(6,1fr);gap:3px}
+.mpick{padding:5px 2px;border-radius:5px;border:1.5px solid var(--border);background:var(--paper2);color:var(--ink2);font-size:.67rem;font-weight:700;cursor:pointer;transition:all .2s;text-align:center}
+.mpick.on{background:var(--green);color:#fff;border-color:var(--green)}
+.color-row{display:flex;gap:6px;flex-wrap:wrap}
+.cswatch{width:26px;height:26px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:all .15s}
+.cswatch.sel{border-color:var(--ink);transform:scale(1.2)}
+.info-box{background:var(--paper2);border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;font-size:.8rem;color:var(--ink2);line-height:1.5;margin-bottom:13px}
+.info-box strong{color:var(--green)}
+.empty-msg{text-align:center;padding:60px 20px;color:var(--ink2)}
+.empty-msg .e{font-size:2.5rem;margin-bottom:12px}
+
+/* PLANT COUNT CHIP on tile */
+.ptile-delete{
+  position:absolute;top:-6px;left:-6px;
+  width:18px;height:18px;border-radius:50%;
+  background:#c0392b;color:#fff;
+  font-size:.7rem;font-weight:900;line-height:1;
+  cursor:pointer;opacity:0;transition:opacity .15s;
+  z-index:50;pointer-events:all;user-select:none;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 1px 4px rgba(0,0,0,.4);
+  border:1.5px solid #fff;
+}
+.ptile:hover .ptile-delete{opacity:1}
+.ptile-confirm{
+  position:absolute;top:-8px;left:-8px;
+  background:var(--soil);color:var(--paper2);
+  border-radius:8px;padding:6px 8px;
+  font-size:.7rem;font-weight:600;white-space:nowrap;
+  z-index:100;box-shadow:0 4px 16px rgba(0,0,0,.4);
+  display:flex;align-items:center;gap:6px;
+  border:1.5px solid rgba(255,255,255,.15);
+}
+.ptile-confirm span{opacity:.8}
+.ptile-confirm button{
+  border:none;border-radius:4px;padding:2px 7px;
+  font-size:.7rem;font-weight:700;cursor:pointer;
+}
+.ptile-confirm .c-yes{background:#c0392b;color:#fff;}
+.ptile-confirm .c-no{background:rgba(255,255,255,.2);color:#fff;}
+.ptile-count{
+  position:absolute;bottom:3px;left:3px;
+  background:rgba(0,0,0,.55);color:#fff;
+  font-size:.52rem;font-weight:700;
+  padding:1px 4px;border-radius:3px;
+  pointer-events:none;line-height:1.4;
+  white-space:nowrap;
+}
+/* SPACE HINT in modal */
+.space-hint{
+  background:#e8f0ea;border:1.5px solid #b0d4b8;border-radius:8px;
+  padding:9px 13px;font-size:.8rem;color:#2e5a38;line-height:1.6;
+  margin-bottom:13px;display:flex;align-items:flex-start;gap:8px;
+}
+.space-hint .sh-icon{font-size:1.2rem;flex-shrink:0;margin-top:1px}
+.space-hint strong{color:#1a4025}
+/* inline stat badges in pflanze card */
+.stat-badge{
+  display:inline-flex;align-items:center;gap:3px;
+  background:var(--paper3);border:1px solid var(--border);
+  border-radius:5px;padding:2px 7px;font-size:.7rem;font-weight:600;color:var(--ink2);
+}
+.stat-badge span{color:var(--ink);font-weight:700}
+
+/* FILTER BAR */
+.pfl-filter-bar{
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+  background:var(--paper2);border:1.5px solid var(--border);
+  border-radius:var(--r);padding:10px 14px;
+  flex-shrink:0;
+}
+.pfl-filter-bar label{font-size:.72rem;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.filter-select{padding:5px 10px;border:1.5px solid var(--border);border-radius:7px;font-family:'DM Sans',sans-serif;font-size:.82rem;background:var(--paper);color:var(--ink);cursor:pointer}
+.filter-select:focus{outline:none;border-color:var(--green)}
+.filter-active{border-color:var(--green)!important;background:#e8f5ea!important;color:var(--green)!important;font-weight:700}
+.pfl-count{font-size:.75rem;color:var(--ink2);margin-left:auto}
+
+/* JSON INJECTOR */
+.injector-wrap{
+  background:var(--paper2);border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden;flex-shrink:0;
+}
+.injector-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;cursor:pointer;user-select:none;
+  border-bottom:1.5px solid transparent;transition:border-color .2s;
+}
+.injector-head:hover{background:var(--paper3)}
+.injector-head.open{border-bottom-color:var(--border)}
+.injector-body{display:none;padding:14px}
+.injector-body.open{display:block}
+.injector-body textarea{
+  width:100%;min-height:110px;resize:vertical;
+  padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;
+  font-family:monospace;font-size:.78rem;background:var(--paper);color:var(--ink);
+  transition:border-color .2s;
+}
+.injector-body textarea:focus{outline:none;border-color:var(--green)}
+.injector-result{margin-top:8px;font-size:.78rem;padding:6px 10px;border-radius:6px;display:none}
+.injector-result.ok{background:#e8f5ea;color:#2e7040;border:1px solid #b0d4b8}
+.injector-result.err{background:#fdeaea;color:#8a2828;border:1px solid #f0b0b0}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Garten<em>planer</em> 🌿</h1>
+    <nav>
+      <button class="nav-btn active" id="nav-beete" onclick="showPanel('beete')">🌿 Beete</button>
+      <button class="nav-btn" id="nav-pflanzen" onclick="showPanel('pflanzen')">🌸 Pflanzen</button>
+      <button class="nav-btn" id="nav-kalender" onclick="showPanel('kalender')">📅 Aufgaben</button>
+    </nav>
+    <span id="save-indicator" style="font-size:.75rem;font-weight:600;letter-spacing:.04em;min-width:90px;text-align:right;transition:color .3s"></span>
+  </header>
+  <div class="content">
+
+    <!-- BEETE -->
+    <div id="panel-beete" class="panel active">
+      <div class="beet-sidebar">
+        <div class="sidebar-head">
+          <h3>Beete</h3>
+          <button class="btn btn-amber btn-sm" onclick="openBeetModal()">+ Neu</button>
+        </div>
+        <div class="beet-list" id="beet-list"></div>
+      </div>
+      <div class="beet-main">
+        <div class="beet-empty" id="beet-empty">
+          <div class="icon">🌱</div>
+          <p>Kein Beet ausgewählt.<br>Lege dein erstes Beet an!</p>
+          <button class="btn btn-primary" onclick="openBeetModal()">+ Erstes Beet</button>
+        </div>
+        <div id="beet-view">
+          <div class="mtabs-bar" id="mtabs"></div>
+          <div class="tline-wrap"><div class="tline-bar" id="tbar"></div></div>
+          <div class="aufgaben-legende">
+            <span style="font-size:.68rem;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.06em">Aufgaben:</span>
+            <div class="legende-item"><div class="legende-dot" style="background:#2e7040"></div>Säen</div>
+            <div class="legende-item"><div class="legende-dot" style="background:#1a5090"></div>Pflanzen</div>
+            <div class="legende-item"><div class="legende-dot" style="background:#505050"></div>Pflege</div>
+            <div class="legende-item"><div class="legende-dot" style="background:#8a4520"></div>Ernte</div>
+            <span style="margin-left:auto;font-size:.7rem;color:var(--ink2)">💡 Klicken zum Platzieren · Rand ziehen zum Vergrößern · Tile ziehen zum Verschieben</span>
+          </div>
+          <div class="canvas-area" id="canvas-area">
+            <div class="canvas-wrap" id="canvas-wrap">
+              <div class="grid-cells" id="grid-cells"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PFLANZEN -->
+    <div id="panel-pflanzen" class="panel">
+      <div class="pflanzen-scroll">
+        <div class="pflanzen-header">
+          <h2>Pflanzen</h2>
+          <button class="btn btn-primary" onclick="openPflanzeModal()">+ Neue Pflanze</button>
+        </div>
+
+        <!-- FILTER BAR -->
+        <div class="pfl-filter-bar">
+          <label>Anbau</label>
+          <select class="filter-select" id="filter-anbau" onchange="renderPflanzen()">
+            <option value="">Alle Monate</option>
+            <option value="0">Januar</option><option value="1">Februar</option><option value="2">März</option>
+            <option value="3">April</option><option value="4">Mai</option><option value="5">Juni</option>
+            <option value="6">Juli</option><option value="7">August</option><option value="8">September</option>
+            <option value="9">Oktober</option><option value="10">November</option><option value="11">Dezember</option>
+          </select>
+          <label style="margin-left:8px">Ernte</label>
+          <select class="filter-select" id="filter-ernte" onchange="renderPflanzen()">
+            <option value="">Alle Monate</option>
+            <option value="0">Januar</option><option value="1">Februar</option><option value="2">März</option>
+            <option value="3">April</option><option value="4">Mai</option><option value="5">Juni</option>
+            <option value="6">Juli</option><option value="7">August</option><option value="8">September</option>
+            <option value="9">Oktober</option><option value="10">November</option><option value="11">Dezember</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="clearPflFilter()" style="margin-left:4px">✕ Reset</button>
+          <span class="pfl-count" id="pfl-count"></span>
+        </div>
+
+        <!-- JSON INJECTOR -->
+        <div class="injector-wrap">
+          <div class="injector-head" id="injector-head" onclick="toggleInjector()">
+            <span style="font-size:.82rem;font-weight:600;color:var(--ink2)">📥 Pflanzen aus Scanner einfügen (JSON)</span>
+            <span id="injector-arrow" style="color:var(--ink2);font-size:.8rem">▸</span>
+          </div>
+          <div class="injector-body" id="injector-body">
+            <textarea id="injector-json" placeholder='Hier den kopierten JSON aus dem Saatgut-Scanner einfügen…&#10;&#10;Erlaubt: ein einzelnes Objekt {} oder ein Array [{}]'></textarea>
+            <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+              <button class="btn btn-primary btn-sm" onclick="injectJSON()">📥 Importieren</button>
+              <button class="btn btn-ghost btn-sm" onclick="document.getElementById('injector-json').value=''">Leeren</button>
+              <div class="injector-result" id="injector-result"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pflanzen-grid" id="pflanzen-grid"></div>
+        <div class="empty-msg" id="pflanzen-empty" style="display:none"><div class="e">🌸</div><p>Keine Pflanzen gefunden.</p></div>
+      </div>
+    </div>
+
+    <!-- KALENDER -->
+    <div id="panel-kalender" class="panel">
+      <div class="kal-scroll">
+        <div class="kal-header">
+          <h2>Aufgaben</h2>
+          <button class="btn btn-primary" onclick="exportICS()">📥 .ics Export</button>
+        </div>
+        <div id="kal-content"></div>
+        <div class="empty-msg" id="kal-empty" style="display:none"><div class="e">📅</div><p>Keine Aufgaben vorhanden.</p></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- DRAG GHOST -->
+<div id="drag-ghost"></div>
+
+<!-- MODAL Beet -->
+<div class="overlay" id="modal-beet">
+  <div class="modal">
+    <h3 id="beet-modal-t">Neues Beet</h3>
+    <div class="fg"><label>Name</label><input id="bn" placeholder="z.B. Hochbeet Nord"/></div>
+    <div class="fg-row">
+      <div class="fg"><label>Breite (cm)</label><input id="bw" type="number" min="10" max="2000" value="200"/></div>
+      <div class="fg"><label>Tiefe (cm)</label><input id="bh" type="number" min="10" max="2000" value="100"/></div>
+    </div>
+    <div class="fg"><label>Notiz</label><textarea id="bno" placeholder="Standort, Bodenbeschaffenheit…"></textarea></div>
+    <div class="modal-acts">
+      <button class="btn btn-ghost" onclick="closeModal('modal-beet')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="saveBeet()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL Pflanze anlegen -->
+<div class="overlay" id="modal-pflanze">
+  <div class="modal">
+    <h3 id="pfl-modal-t">Neue Pflanze</h3>
+    <div class="fg-row">
+      <div class="fg"><label>Name</label><input id="pn" placeholder="Tomaten"/></div>
+      <div class="fg"><label>Emoji</label><input id="pe" maxlength="2" placeholder="🍅" style="font-size:1.3rem;text-align:center"/></div>
+    </div>
+    <div class="fg"><label>Typ</label><select id="pt"><option>Gemüse</option><option>Obst</option><option>Kräuter</option><option>Blumen</option><option>Sonstiges</option></select></div>
+    <div class="fg"><label>Farbe im Beet</label><div class="color-row" id="cswatches"></div></div>
+    <div class="fg"><label>Anbaumonate</label><div class="mpicker" id="mpan"></div></div>
+    <div class="fg"><label>Erntemonate</label><div class="mpicker" id="mper"></div></div>
+    <div class="fg-row">
+      <div class="fg">
+        <label>Pflanzen pro Zelle (10×10cm)</label>
+        <input id="ppqm" type="number" min="1" max="100" value="1" placeholder="1"/>
+        <div style="font-size:.7rem;color:var(--ink2);margin-top:3px">z.B. Karotten: 16, Tomaten: 1</div>
+      </div>
+      <div class="fg">
+        <label>Platzbedarf (Zellen)</label>
+        <input id="pzel" type="number" min="1" max="100" value="1" placeholder="1"/>
+        <div style="font-size:.7rem;color:var(--ink2);margin-top:3px">z.B. Zucchini: 4, Tomate: 2</div>
+      </div>
+    </div>
+    <div class="fg"><label>Pflegehinweise</label><textarea id="pp" placeholder="Gießen, Düngen…"></textarea></div>
+    <div class="modal-acts">
+      <button class="btn btn-ghost" onclick="closeModal('modal-pflanze')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="savePflanze()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL Platzierung -->
+<div class="overlay" id="modal-place">
+  <div class="modal">
+    <h3 id="place-t">Pflanze setzen</h3>
+    <div class="info-box" id="place-info"></div>
+    <div class="fg"><label>Pflanze</label><select id="pl-pfl" onchange="updatePlaceHint()"></select></div>
+    <div class="space-hint" id="place-hint" style="display:none">
+      <span class="sh-icon">📐</span>
+      <div id="place-hint-text"></div>
+    </div>
+    <div class="fg-row">
+      <div class="fg"><label>Erster Monat (Säen/Pflanzen)</label><select id="pl-von"></select></div>
+      <div class="fg"><label>Letzter Monat (Ernte)</label><select id="pl-bis"></select></div>
+    </div>
+    <div class="info-box">
+      <strong>Automatische Aufgaben:</strong><br>
+      Erster Monat → <strong style="color:#2e7040">Säen</strong> oder <strong style="color:#1a5090">Pflanzen</strong><br>
+      Zwischenmonate → <strong style="color:#505050">Pflege</strong><br>
+      Letzter Monat → <strong style="color:#8a4520">Ernte</strong>
+    </div>
+    <div class="fg"><label>Startaufgabe (erster Monat)</label>
+      <select id="pl-start"><option value="Säen">🌱 Säen</option><option value="Pflanzen">🪴 Pflanzen (Setzling)</option></select>
+    </div>
+    <div class="modal-acts">
+      <button class="btn btn-ghost" onclick="closeModal('modal-place')">Abbrechen</button>
+      <button class="btn btn-danger btn-sm" id="remove-btn" onclick="removePlacement()" style="display:none">🗑 Entfernen</button>
+      <button class="btn btn-primary" onclick="savePlacement()">Platzieren</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// CONSTANTS & STATE
+// ═══════════════════════════════════════════════════
+const MN=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+const ML=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const CPIX=32; // px per 10cm cell
+const COLORS=['#7cb87e','#e8b460','#e07070','#70a8e0','#b870d8','#d4c060','#60d4c0','#c0d460','#e07090','#8890e0'];
+const BADGE={Säen:'badge-sae',Pflanzen:'badge-pfl',Pflege:'badge-care',Ernte:'badge-ern'};
+const TAG_CLS={Säen:'ts',Pflanzen:'tp',Ernte:'te',Pflege:'tpf'};
+
+let S={beete:[],pflanzen:[]};
+let activeBeetId=null, activeMonth=0, playInterval=null;
+let editBeetId=null, editPflId=null, selColor=COLORS[0];
+let editPlacementId=null, editCellSeed=null; // for place modal
+
+// ═══════════════════════════════════════════════════
+// PERSIST  — server-backed JSON file
+// ═══════════════════════════════════════════════════
+let _saveTimer = null;
+
+// Debounced save: waits 400ms after last change before writing
+function save() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(_flushSave, 400);
+}
+
+async function _flushSave() {
+  try {
+    const res = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(S)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    setSaveIndicator('saved');
+  } catch (e) {
+    console.error('Speichern fehlgeschlagen:', e);
+    setSaveIndicator('error');
+  }
+}
+
+async function load() {
+  try {
+    const res = await fetch('/api/data');
+    if (!res.ok) throw new Error(res.status);
+    const d = await res.json();
+    S.beete    = d.beete    || [];
+    S.pflanzen = d.pflanzen || [];
+    // migrate old pl-key format
+    S.beete.forEach(b => {
+      if (!b.placements) b.placements = [];
+      if (b.pl) {
+        Object.entries(b.pl).forEach(([key, pl]) => {
+          const [r, c] = key.split(',').map(Number);
+          if (!b.placements.find(p => p.r === r && p.c === c)) {
+            b.placements.push({ id: uid(), r, c, rows: 1, cols: 1,
+              von: pl.von, bis: pl.bis, pflanzeId: pl.pflanzeId,
+              startAufgabe: pl.aufgabe || 'Säen' });
+          }
+        });
+        delete b.pl;
+      }
+    });
+  } catch (e) {
+    console.warn('Daten konnten nicht geladen werden, starte leer.', e);
+    S.beete    = [];
+    S.pflanzen = [];
+  }
+}
+
+// Small save-status indicator in the header
+function setSaveIndicator(state) {
+  const el = document.getElementById('save-indicator');
+  if (!el) return;
+  if (state === 'saved') {
+    el.textContent = '✓ Gespeichert';
+    el.style.color = '#7bb87e';
+    setTimeout(() => { el.textContent = ''; }, 2000);
+  } else if (state === 'saving') {
+    el.textContent = '…';
+    el.style.color = '#e8b870';
+  } else {
+    el.textContent = '⚠ Fehler';
+    el.style.color = '#e07070';
+  }
+}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+
+// ═══════════════════════════════════════════════════
+// AUFGABE for a placement at a given month
+// ═══════════════════════════════════════════════════
+function getAufgabeForMonth(pl, month){
+  if(month===pl.von) return pl.startAufgabe||'Säen';
+  if(month===pl.bis) return pl.bis>pl.von?'Ernte':(pl.startAufgabe||'Säen');
+  return 'Pflege';
+}
+
+// ═══════════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════════
+function showPanel(name){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  document.getElementById('nav-'+name).classList.add('active');
+  if(name==='kalender')renderKalender();
+  if(name==='pflanzen')renderPflanzen();
+}
+const openModal=id=>document.getElementById(id).classList.add('open');
+const closeModal=id=>document.getElementById(id).classList.remove('open');
+document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}));
+
+// ═══════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════
+function buildPicker(id,sel=[]){
+  document.getElementById(id).innerHTML=MN.map((m,i)=>`<button type="button" class="mpick${sel.includes(i)?' on':''}" onclick="this.classList.toggle('on')">${m}</button>`).join('');
+}
+function getPicked(id){return[...document.querySelectorAll(`#${id} .mpick`)].map((b,i)=>b.classList.contains('on')?i:null).filter(x=>x!==null)}
+function buildSwatches(cur){
+  selColor=cur||COLORS[0];
+  document.getElementById('cswatches').innerHTML=COLORS.map(c=>`<div class="cswatch${c===selColor?' sel':''}" style="background:${c}" onclick="pickColor('${c}',this)"></div>`).join('');
+}
+function pickColor(c,el){selColor=c;document.querySelectorAll('.cswatch').forEach(s=>s.classList.remove('sel'));el.classList.add('sel')}
+
+// ═══════════════════════════════════════════════════
+// SEED DATA
+// ═══════════════════════════════════════════════════
+function seed(){
+  if(S.pflanzen.length)return;
+  S.pflanzen=[
+    {id:uid(),name:'Tomaten',    emoji:'🍅',typ:'Gemüse',color:COLORS[0],anbauMonate:[3,4],  ernteMonate:[6,7,8,9],  pflege:'Ausgeizen, viel Wasser',   pflanzenProQm:1,  zellenBedarf:2},
+    {id:uid(),name:'Karotten',   emoji:'🥕',typ:'Gemüse',color:COLORS[1],anbauMonate:[2,3,4], ernteMonate:[6,7,8],   pflege:'Vereinzeln bei 3cm',        pflanzenProQm:16, zellenBedarf:1},
+    {id:uid(),name:'Basilikum',  emoji:'🌿',typ:'Kräuter',color:COLORS[7],anbauMonate:[3,4,5], ernteMonate:[5,6,7,8,9],pflege:'Sonnig, nicht zu nass',   pflanzenProQm:4,  zellenBedarf:1},
+    {id:uid(),name:'Zucchini',   emoji:'🥒',typ:'Gemüse',color:COLORS[2],anbauMonate:[4,5],   ernteMonate:[6,7,8,9],  pflege:'Viel Platz & Wasser',       pflanzenProQm:1,  zellenBedarf:6},
+    {id:uid(),name:'Erdbeeren',  emoji:'🍓',typ:'Obst',  color:COLORS[3],anbauMonate:[2,3,9],  ernteMonate:[5,6,7],   pflege:'Ausläufer entfernen',       pflanzenProQm:4,  zellenBedarf:1},
+    {id:uid(),name:'Salat',      emoji:'🥬',typ:'Gemüse',color:COLORS[4],anbauMonate:[2,3,4,8],ernteMonate:[4,5,9,10],pflege:'Gleichmäßig feucht halten', pflanzenProQm:4,  zellenBedarf:1},
+    {id:uid(),name:'Kürbis',     emoji:'🎃',typ:'Gemüse',color:COLORS[1],anbauMonate:[4,5],   ernteMonate:[9,10],     pflege:'Ranken führen, viel Platz', pflanzenProQm:1,  zellenBedarf:12},
+    {id:uid(),name:'Radieschen', emoji:'🌰',typ:'Gemüse',color:COLORS[8],anbauMonate:[2,3,4,8],ernteMonate:[4,5,6,9,10],pflege:'Locker säen, dünn halten',pflanzenProQm:16, zellenBedarf:1},
+    {id:uid(),name:'Chicoree Etardo',emoji:'🥗',typ:'Gemüse',color:COLORS[6],anbauMonate:[4,8,9],ernteMonate:[9,10,11],pflege:'Saattiefe 1cm, Reihenabstand 40cm, Pflanzenabstand 10cm. Keimfähigkeit 83%.',pflanzenProQm:1,zellenBedarf:4},
+  ];
+  save();
+}
+
+// ═══════════════════════════════════════════════════
+// BEET SIDEBAR
+// ═══════════════════════════════════════════════════
+function openBeetModal(id=null){
+  editBeetId=id;
+  const b=id?S.beete.find(x=>x.id===id):null;
+  document.getElementById('beet-modal-t').textContent=b?'Beet bearbeiten':'Neues Beet';
+  document.getElementById('bn').value=b?.name||'';
+  document.getElementById('bw').value=b?.w||200;
+  document.getElementById('bh').value=b?.h||100;
+  document.getElementById('bno').value=b?.notiz||'';
+  openModal('modal-beet');
+}
+function saveBeet(){
+  const name=document.getElementById('bn').value.trim();
+  if(!name){alert('Name erforderlich');return}
+  const w=Math.max(10,parseInt(document.getElementById('bw').value)||200);
+  const h=Math.max(10,parseInt(document.getElementById('bh').value)||100);
+  if(editBeetId){
+    const b=S.beete.find(x=>x.id===editBeetId);
+    b.name=name;b.w=w;b.h=h;b.notiz=document.getElementById('bno').value.trim();
+  }else{
+    const nb={id:uid(),name,w,h,notiz:document.getElementById('bno').value.trim(),placements:[]};
+    S.beete.push(nb);activeBeetId=nb.id;
+  }
+  save();closeModal('modal-beet');renderBeetSidebar();
+  selectBeet(editBeetId||S.beete[S.beete.length-1].id);
+}
+function deleteBeet(id,e){
+  e.stopPropagation();
+  if(!confirm('Beet löschen?'))return;
+  S.beete=S.beete.filter(x=>x.id!==id);
+  if(activeBeetId===id){activeBeetId=null;showBeetEmpty()}
+  save();renderBeetSidebar();
+}
+function renderBeetSidebar(){
+  const list=document.getElementById('beet-list');
+  if(!S.beete.length){list.innerHTML='<p style="color:#a89878;font-size:.8rem;padding:8px 12px">Keine Beete.</p>';return}
+  list.innerHTML=S.beete.map(b=>`
+    <div class="bli${b.id===activeBeetId?' active':''}" onclick="selectBeet('${b.id}')">
+      <div><div class="bli-name">${b.name}</div><div class="bli-size">${b.w}×${b.h} cm</div></div>
+      <div class="bli-acts">
+        <button class="btn btn-ghost btn-icon" onclick="openBeetModal('${b.id}');event.stopPropagation()">✏️</button>
+        <button style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:4px 8px;cursor:pointer" onclick="deleteBeet('${b.id}',event)">🗑</button>
+      </div>
+    </div>`).join('');
+}
+function showBeetEmpty(){
+  document.getElementById('beet-empty').style.display='flex';
+  document.getElementById('beet-view').style.display='none';
+}
+
+// ═══════════════════════════════════════════════════
+// BEET VIEW
+// ═══════════════════════════════════════════════════
+function selectBeet(id){
+  activeBeetId=id;activeMonth=0;stopPlay();
+  renderBeetSidebar();renderBeetView();
+}
+function renderBeetView(){
+  const b=S.beete.find(x=>x.id===activeBeetId);
+  if(!b){showBeetEmpty();return}
+  document.getElementById('beet-empty').style.display='none';
+  document.getElementById('beet-view').style.display='flex';
+  renderMonthTabs(b);
+  renderCanvas(b,activeMonth);
+}
+function renderMonthTabs(b){
+  const bar=document.getElementById('mtabs');
+  const hasPl=m=>b.placements&&b.placements.some(p=>m>=p.von&&m<=p.bis);
+  bar.innerHTML=MN.map((m,i)=>`
+    <div class="mtab${i===activeMonth?' active':''}${hasPl(i)?' has-p':''}" onclick="switchMonth(${i})">${m}</div>
+  `).join('');
+  bar.innerHTML+=`<div class="mcontrols"><button class="play-btn${playInterval?' playing':''}" id="playbtn" onclick="togglePlay()">${playInterval?'⏹ Stop':'▶ Zeitraffer'}</button></div>`;
+  document.getElementById('tbar').style.width=((activeMonth/11)*100)+'%';
+}
+function switchMonth(m){
+  activeMonth=m;
+  const b=S.beete.find(x=>x.id===activeBeetId);
+  if(b){renderMonthTabs(b);renderCanvas(b,m)}
+}
+
+// ═══════════════════════════════════════════════════
+// CANVAS RENDER
+// ═══════════════════════════════════════════════════
+function renderCanvas(b,month){
+  const cols=Math.ceil(b.w/10), rows=Math.ceil(b.h/10);
+  const wrap=document.getElementById('canvas-wrap');
+  const cells=document.getElementById('grid-cells');
+  wrap.style.width=(cols*CPIX)+'px';wrap.style.height=(rows*CPIX)+'px';
+  cells.style.width=(cols*CPIX)+'px';cells.style.height=(rows*CPIX)+'px';
+
+  // SVG GRID
+  let svg=`<svg class="grid-svg" width="${cols*CPIX}" height="${rows*CPIX}" xmlns="http://www.w3.org/2000/svg">`;
+  for(let c=0;c<=cols;c++){const t=c%10===0;svg+=`<line x1="${c*CPIX}" y1="0" x2="${c*CPIX}" y2="${rows*CPIX}" stroke="rgba(160,140,90,${t?.45:.18})" stroke-width="${t?1.5:1}"/>`}
+  for(let r=0;r<=rows;r++){const t=r%10===0;svg+=`<line x1="0" y1="${r*CPIX}" x2="${cols*CPIX}" y2="${r*CPIX}" stroke="rgba(160,140,90,${t?.45:.18})" stroke-width="${t?1.5:1}"/>`}
+  for(let c=0;c<=cols;c+=5)svg+=`<text x="${c*CPIX+2}" y="9" font-size="6.5" fill="rgba(100,80,40,.5)" font-family="DM Sans">${c*10}</text>`;
+  for(let r=1;r<=rows;r+=5)svg+=`<text x="2" y="${r*CPIX-2}" font-size="6.5" fill="rgba(100,80,40,.5)" font-family="DM Sans">${r*10}</text>`;
+  svg+='</svg>';
+  const old=wrap.querySelector('.grid-svg');if(old)old.remove();
+  wrap.insertAdjacentHTML('afterbegin',svg);
+  cells.innerHTML='';
+
+  // Occupied cells set (for empty cell targets)
+  const occupied=new Set();
+
+  // Render placements visible in this month
+  if(b.placements){
+    b.placements.forEach(pl=>{
+      if(month<pl.von||month>pl.bis)return;
+      const pfl=S.pflanzen.find(x=>x.id===pl.pflanzeId);
+      if(!pfl)return;
+
+      // Mark cells occupied
+      for(let dr=0;dr<pl.rows;dr++)for(let dc=0;dc<pl.cols;dc++)occupied.add(`${pl.r+dr},${pl.c+dc}`);
+
+      // Growth animation
+      const progress=pl.bis>pl.von?(month-pl.von)/(pl.bis-pl.von):1;
+      const scale=0.65+0.35*progress;
+      const alpha=Math.round((0.55+0.45*progress)*255).toString(16).padStart(2,'0');
+      const aufgabe=getAufgabeForMonth(pl,month);
+      const w=pl.cols*CPIX-2, h=pl.rows*CPIX-2;
+
+      const tile=document.createElement('div');
+      tile.className='ptile';
+      tile.dataset.plId=pl.id;
+      tile.style.cssText=`left:${pl.c*CPIX+1}px;top:${pl.r*CPIX+1}px;width:${w}px;height:${h}px;background:${pfl.color||COLORS[0]}${alpha}`;
+
+      const emojiSize=Math.min(1.4, Math.max(0.7, (Math.min(w,h)/CPIX)*0.85))+'rem';
+      const totalPflanzen=pl.rows*pl.cols*(pfl.pflanzenProQm||1);
+      const showLabel=Math.min(w,h)>CPIX*1.5;
+      const showCount=Math.min(w,h)>CPIX*0.9; // show count chip if tile is big enough
+      tile.innerHTML=`
+        <div class="ptile-inner">
+          <span class="ptile-emoji" style="font-size:${emojiSize}">${pfl.emoji||'🌱'}</span>
+          ${showLabel?`<span class="ptile-label">${pfl.name}</span>`:''}
+          <span class="ptile-badge ${BADGE[aufgabe]||'badge-care'}">${aufgabe[0]}</span>
+          ${showCount?`<span class="ptile-count">${totalPflanzen}×</span>`:''}
+        </div>
+        <div class="ptile-tooltip">${pfl.emoji} ${pfl.name}<br>${MN[pl.von]}–${MN[pl.bis]} · ${aufgabe}<br>🌱 ${totalPflanzen} Pflanze${totalPflanzen!==1?'n':''} · 📐 ${pl.cols*10}×${pl.rows*10} cm</div>
+        <div class="ptile-resize" data-resize="${pl.id}" title="Größe ziehen"></div>
+      `;
+
+      // Delete button — inline confirm, no browser dialog
+      const delBtn = document.createElement('div');
+      delBtn.className = 'ptile-delete';
+      delBtn.title = 'Anpflanzung löschen';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', e=>{
+        e.stopPropagation();
+        e.preventDefault();
+        // Remove any existing confirm popup
+        tile.querySelectorAll('.ptile-confirm').forEach(x=>x.remove());
+        // Build inline confirm
+        const conf = document.createElement('div');
+        conf.className = 'ptile-confirm';
+        conf.innerHTML = `<span>Löschen?</span><button class="c-yes">Ja</button><button class="c-no">Nein</button>`;
+        conf.querySelector('.c-yes').addEventListener('click', e=>{
+          e.stopPropagation();
+          b.placements = b.placements.filter(p => p.id !== pl.id);
+          save();
+          renderMonthTabs(b);
+          renderCanvas(b, activeMonth);
+        });
+        conf.querySelector('.c-no').addEventListener('click', e=>{
+          e.stopPropagation();
+          conf.remove();
+        });
+        tile.appendChild(conf);
+      });
+      tile.appendChild(delBtn);
+
+      // Click inner to open edit modal (only if not a drag)
+      let _downX, _downY;
+      tile.querySelector('.ptile-inner').addEventListener('mousedown', e=>{
+        _downX=e.clientX; _downY=e.clientY;
+      });
+      tile.querySelector('.ptile-inner').addEventListener('click', e=>{
+        e.stopPropagation();
+        // Ignore if user dragged more than 4px (it was a move, not a click)
+        if(Math.abs(e.clientX-_downX)>4 || Math.abs(e.clientY-_downY)>4) return;
+        openPlaceModal(pl.r, pl.c, pl.id);
+      });
+
+      // DRAG TO MOVE
+      setupDragMove(tile, pl, b, cols, rows);
+      // DRAG TO RESIZE
+      setupDragResize(tile.querySelector('.ptile-resize'), pl, b, cols, rows);
+
+      cells.appendChild(tile);
+    });
+  }
+
+  // Empty cell click targets
+  const maxR=rows, maxC=cols;
+  for(let r=0;r<maxR;r++){
+    for(let c=0;c<maxC;c++){
+      if(occupied.has(`${r},${c}`))continue;
+      const cell=document.createElement('div');
+      cell.className='gcell';
+      cell.style.cssText=`left:${c*CPIX}px;top:${r*CPIX}px;width:${CPIX}px;height:${CPIX}px`;
+      cell.innerHTML='<div class="gcell-hover"></div>';
+      cell.addEventListener('click',()=>openPlaceModal(r,c,null));
+      cells.appendChild(cell);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// DRAG: MOVE TILE
+// ═══════════════════════════════════════════════════
+function setupDragMove(tile, pl, b, maxCols, maxRows){
+  const inner=tile.querySelector('.ptile-inner');
+  let dragging=false, startX, startY, startR, startC;
+
+  inner.addEventListener('mousedown', e=>{
+    if(e.button!==0)return;
+    // Don't preventDefault here so click still fires when no real drag happens
+    e.stopPropagation();
+    startX=e.clientX;startY=e.clientY;
+    startR=pl.r;startC=pl.c;
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  function onMove(e){
+    const dx=e.clientX-startX, dy=e.clientY-startY;
+    // Only start dragging after 5px threshold
+    if(!dragging && Math.abs(dx)<5 && Math.abs(dy)<5) return;
+    if(!dragging){
+      dragging=true;
+      tile.classList.add('dragging');
+    }
+    const dc=Math.round(dx/CPIX), dr=Math.round(dy/CPIX);
+    const newR=Math.max(0,Math.min(maxRows-pl.rows, startR+dr));
+    const newC=Math.max(0,Math.min(maxCols-pl.cols, startC+dc));
+    // Check overlap (pass own time range so only same-period tiles block)
+    if(!checkOverlap(b,pl.id,newR,newC,pl.rows,pl.cols,pl.von,pl.bis)){
+      tile.style.left=(newC*CPIX+1)+'px';
+      tile.style.top=(newR*CPIX+1)+'px';
+      pl.r=newR;pl.c=newC;
+    }
+  }
+  function onUp(){
+    if(!dragging)return;
+    dragging=false;
+    tile.classList.remove('dragging');
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+    save();
+    renderMonthTabs(b);
+    renderCanvas(b,activeMonth);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// DRAG: RESIZE TILE
+// ═══════════════════════════════════════════════════
+function setupDragResize(handle, pl, b, maxCols, maxRows){
+  let resizing=false, startX, startY, startRows, startCols;
+
+  handle.addEventListener('mousedown', e=>{
+    if(e.button!==0)return;
+    e.preventDefault();e.stopPropagation();
+    resizing=true;startX=e.clientX;startY=e.clientY;
+    startRows=pl.rows;startCols=pl.cols;
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  function onMove(e){
+    if(!resizing)return;
+    const dx=e.clientX-startX, dy=e.clientY-startY;
+    const dc=Math.round(dx/CPIX), dr=Math.round(dy/CPIX);
+    const newRows=Math.max(1,Math.min(maxRows-pl.r, startRows+dr));
+    const newCols=Math.max(1,Math.min(maxCols-pl.c, startCols+dc));
+    if(!checkOverlap(b,pl.id,pl.r,pl.c,newRows,newCols,pl.von,pl.bis)){
+      pl.rows=newRows;pl.cols=newCols;
+      // live update tile size
+      const tile=document.querySelector(`.ptile[data-pl-id="${pl.id}"]`);
+      if(tile){
+        tile.style.width=(newCols*CPIX-2)+'px';
+        tile.style.height=(newRows*CPIX-2)+'px';
+      }
+    }
+  }
+  function onUp(){
+    if(!resizing)return;
+    resizing=false;
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+    save();
+    renderCanvas(b,activeMonth);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// OVERLAP CHECK — respects both space AND time
+// von/bis optional: if provided, only conflicts with placements
+// whose month range overlaps. Omit for drag-move/resize (keeps own range).
+// ═══════════════════════════════════════════════════
+function checkOverlap(b, excludeId, r, c, rows, cols, von, bis){
+  if(!b.placements) return false;
+  for(const pl of b.placements){
+    if(pl.id === excludeId) continue;
+    // spatial intersection?
+    if(!(r < pl.r+pl.rows && r+rows > pl.r && c < pl.c+pl.cols && c+cols > pl.c)) continue;
+    // time intersection? (only block if months actually overlap)
+    if(von !== undefined && bis !== undefined){
+      if(bis < pl.von || von > pl.bis) continue; // no time overlap → no conflict
+    }
+    return true;
+  }
+  return false;
+}
+
+// ═══════════════════════════════════════════════════
+// PLACEMENT MODAL
+// ═══════════════════════════════════════════════════
+function openPlaceModal(row, col, plId){
+  editPlacementId=plId;
+  editCellSeed={row,col};
+  const b=S.beete.find(x=>x.id===activeBeetId);
+  const ex=plId?b.placements.find(p=>p.id===plId):null;
+
+  document.getElementById('place-t').textContent=ex?'Platzierung bearbeiten':'Pflanze setzen';
+  document.getElementById('place-info').textContent=ex
+    ?`Fläche: ${ex.cols*10}×${ex.rows*10} cm (${ex.cols*ex.rows} Zellen · ${calcPflanzenCount(ex)} Pflanzen)`
+    :`Position: ${col*10} / ${row*10} cm`;
+  document.getElementById('remove-btn').style.display=ex?'inline-flex':'none';
+
+  const pSel=document.getElementById('pl-pfl');
+  pSel.innerHTML=S.pflanzen.length
+    ?S.pflanzen.map(p=>`<option value="${p.id}"${ex?.pflanzeId===p.id?' selected':''}>${p.emoji} ${p.name}</option>`).join('')
+    :'<option value="">Keine Pflanzen vorhanden — erst anlegen!</option>';
+
+  if(ex&&ex.startAufgabe) document.getElementById('pl-start').value=ex.startAufgabe;
+
+  ['pl-von','pl-bis'].forEach((sid,isB)=>{
+    document.getElementById(sid).innerHTML=MN.map((m,i)=>
+      `<option value="${i}"${(ex?(isB?ex.bis:ex.von):activeMonth)===i?' selected':''}>${m}</option>`).join('');
+  });
+
+  // Show hint immediately
+  updatePlaceHint();
+  openModal('modal-place');
+}
+
+// Calculates total plant count for a placement
+function calcPflanzenCount(pl){
+  const pfl=S.pflanzen.find(x=>x.id===pl.pflanzeId);
+  if(!pfl)return '?';
+  const cells=pl.rows*pl.cols;
+  const total=cells*( pfl.pflanzenProQm||1);
+  return total;
+}
+
+// Updates the space hint in the placement modal based on selected plant
+function updatePlaceHint(){
+  const sel=document.getElementById('pl-pfl').value;
+  const hint=document.getElementById('place-hint');
+  const htext=document.getElementById('place-hint-text');
+  if(!sel){hint.style.display='none';return}
+  const pfl=S.pflanzen.find(x=>x.id===sel);
+  if(!pfl){hint.style.display='none';return}
+
+  const z=pfl.zellenBedarf||1;
+  const pqm=pfl.pflanzenProQm||1;
+  // Derive recommended grid dimensions (nearest square-ish layout)
+  const recCols=Math.ceil(Math.sqrt(z));
+  const recRows=Math.ceil(z/recCols);
+  const totalPlants=z*pqm;
+
+  htext.innerHTML=`<strong>${pfl.emoji} ${pfl.name}</strong> benötigt <strong>${z} Zelle${z>1?'n':''}</strong> (${z*10*10/100} dm²) · <strong>${pqm} Pflanze${pqm>1?'n':''} pro Zelle</strong><br>
+    Empfohlene Fläche: <strong>${recCols*10}×${recRows*10} cm</strong> → <strong>${totalPlants} Pflanze${totalPlants>1?'n':''}</strong> gesamt<br>
+    <span style="font-size:.72rem;opacity:.8">Du kannst die Größe nach dem Platzieren per Drag am Rahmen anpassen.</span>`;
+  hint.style.display='flex';
+
+  // If this is a new placement, pre-fill the size (stored for savePlacement to use)
+  if(!editPlacementId){
+    window._recommendedCols=recCols;
+    window._recommendedRows=recRows;
+  }
+}
+function savePlacement(){
+  const b=S.beete.find(x=>x.id===activeBeetId);
+  const pflanzeId=document.getElementById('pl-pfl').value;
+  if(!pflanzeId){alert('Keine Pflanze ausgewählt');return}
+  const von=parseInt(document.getElementById('pl-von').value);
+  const bis=parseInt(document.getElementById('pl-bis').value);
+  if(bis<von){alert('Letzter Monat muss nach erstem Monat liegen');return}
+  const startAufgabe=document.getElementById('pl-start').value;
+  if(!b.placements)b.placements=[];
+  const maxCols=Math.ceil(b.w/10), maxRows=Math.ceil(b.h/10);
+
+  if(editPlacementId){
+    const pl=b.placements.find(p=>p.id===editPlacementId);
+    if(pl){pl.pflanzeId=pflanzeId;pl.von=von;pl.bis=bis;pl.startAufgabe=startAufgabe}
+  }else{
+    const r=editCellSeed.row, c=editCellSeed.col;
+    // Use recommended dimensions from hint, clamped to beet boundaries
+    const pfl=S.pflanzen.find(x=>x.id===pflanzeId);
+    let recCols=window._recommendedCols||1;
+    let recRows=window._recommendedRows||1;
+    // Clamp so tile doesn't go out of bounds
+    recCols=Math.min(recCols, maxCols-c);
+    recRows=Math.min(recRows, maxRows-r);
+    if(checkOverlap(b,null,r,c,recRows,recCols,von,bis)){
+      // Fallback to 1×1 if recommended size is blocked
+      if(checkOverlap(b,null,r,c,1,1,von,bis)){alert('Diese Zelle ist bereits belegt.');return}
+      recRows=1;recCols=1;
+    }
+    b.placements.push({id:uid(),r,c,rows:recRows,cols:recCols,pflanzeId,von,bis,startAufgabe});
+  }
+  window._recommendedCols=1;window._recommendedRows=1;
+  save();closeModal('modal-place');
+  renderMonthTabs(b);renderCanvas(b,activeMonth);
+}
+function removePlacement(){
+  const b=S.beete.find(x=>x.id===activeBeetId);
+  b.placements=b.placements.filter(p=>p.id!==editPlacementId);
+  save();closeModal('modal-place');
+  renderMonthTabs(b);renderCanvas(b,activeMonth);
+}
+
+// ═══════════════════════════════════════════════════
+// ZEITRAFFER
+// ═══════════════════════════════════════════════════
+function togglePlay(){
+  if(playInterval){stopPlay();return}
+  activeMonth=0;
+  playInterval=setInterval(()=>{
+    activeMonth++;
+    if(activeMonth>11){stopPlay();return}
+    const b=S.beete.find(x=>x.id===activeBeetId);
+    if(!b){stopPlay();return}
+    renderMonthTabs(b);renderCanvas(b,activeMonth);
+  },680);
+  const btn=document.getElementById('playbtn');
+  if(btn){btn.classList.add('playing');btn.textContent='⏹ Stop'}
+}
+function stopPlay(){
+  clearInterval(playInterval);playInterval=null;
+  const btn=document.getElementById('playbtn');
+  if(btn){btn.classList.remove('playing');btn.textContent='▶ Zeitraffer'}
+}
+
+// ═══════════════════════════════════════════════════
+// PFLANZEN
+// ═══════════════════════════════════════════════════
+function openPflanzeModal(id=null){
+  editPflId=id;
+  const p=id?S.pflanzen.find(x=>x.id===id):null;
+  document.getElementById('pfl-modal-t').textContent=p?'Pflanze bearbeiten':'Neue Pflanze';
+  document.getElementById('pn').value=p?.name||'';
+  document.getElementById('pe').value=p?.emoji||'';
+  document.getElementById('pt').value=p?.typ||'Gemüse';
+  document.getElementById('pp').value=p?.pflege||'';
+  document.getElementById('ppqm').value=p?.pflanzenProQm||1;
+  document.getElementById('pzel').value=p?.zellenBedarf||1;
+  buildSwatches(p?.color);
+  buildPicker('mpan',p?.anbauMonate||[]);
+  buildPicker('mper',p?.ernteMonate||[]);
+  openModal('modal-pflanze');
+}
+function savePflanze(){
+  const name=document.getElementById('pn').value.trim();
+  if(!name){alert('Name erforderlich');return}
+  const data={
+    name,
+    emoji:document.getElementById('pe').value.trim()||'🌱',
+    typ:document.getElementById('pt').value,
+    color:selColor,
+    anbauMonate:getPicked('mpan'),
+    ernteMonate:getPicked('mper'),
+    pflege:document.getElementById('pp').value.trim(),
+    pflanzenProQm:Math.max(1,parseInt(document.getElementById('ppqm').value)||1),
+    zellenBedarf:Math.max(1,parseInt(document.getElementById('pzel').value)||1),
+  };
+  if(editPflId)Object.assign(S.pflanzen.find(x=>x.id===editPflId),data);
+  else S.pflanzen.push({id:uid(),...data});
+  save();closeModal('modal-pflanze');renderPflanzen();
+}
+function deletePflanze(id,e){
+  e.stopPropagation();
+  if(!confirm('Pflanze löschen?'))return;
+  S.pflanzen=S.pflanzen.filter(x=>x.id!==id);
+  save();renderPflanzen();
+}
+// ── INJECTOR ──────────────────────────────────────────────────────────────
+function toggleInjector(){
+  const body=document.getElementById('injector-body');
+  const head=document.getElementById('injector-head');
+  const arrow=document.getElementById('injector-arrow');
+  const open=body.classList.toggle('open');
+  head.classList.toggle('open',open);
+  arrow.textContent=open?'▾':'▸';
+}
+function injectJSON(){
+  const raw=document.getElementById('injector-json').value.trim();
+  const res=document.getElementById('injector-result');
+  res.style.display='none';
+  if(!raw) return;
+  try {
+    let items=JSON.parse(raw);
+    if(!Array.isArray(items)) items=[items];
+    let added=0;
+    items.forEach(p=>{
+      if(!p.name) return;
+      // always assign a fresh id and default missing fields
+      const entry={
+        id:uid(),
+        name:p.name||'Unbekannt',
+        emoji:p.emoji||'🌱',
+        typ:p.typ||'Gemüse',
+        color:p.color||COLORS[Math.floor(Math.random()*COLORS.length)],
+        anbauMonate:Array.isArray(p.anbauMonate)?p.anbauMonate:[],
+        ernteMonate:Array.isArray(p.ernteMonate)?p.ernteMonate:[],
+        pflege:p.pflege||'',
+        pflanzenProQm:p.pflanzenProQm||1,
+        zellenBedarf:p.zellenBedarf||1,
+      };
+      S.pflanzen.push(entry);
+      added++;
+    });
+    save();
+    renderPflanzen();
+    document.getElementById('injector-json').value='';
+    res.className='injector-result ok';
+    res.textContent=`✓ ${added} Pflanze${added!==1?'n':''} importiert`;
+    res.style.display='block';
+    setTimeout(()=>{res.style.display='none'},3000);
+  } catch(e) {
+    res.className='injector-result err';
+    res.textContent='⚠ Ungültiges JSON: '+e.message;
+    res.style.display='block';
+  }
+}
+
+// ── FILTER ────────────────────────────────────────────────────────────────
+function clearPflFilter(){
+  document.getElementById('filter-anbau').value='';
+  document.getElementById('filter-ernte').value='';
+  document.getElementById('filter-anbau').classList.remove('filter-active');
+  document.getElementById('filter-ernte').classList.remove('filter-active');
+  renderPflanzen();
+}
+
+function renderPflanzen(){
+  const g=document.getElementById('pflanzen-grid'),em=document.getElementById('pflanzen-empty');
+
+  // Read filter values
+  const fAnbau=document.getElementById('filter-anbau')?.value;
+  const fErnte=document.getElementById('filter-ernte')?.value;
+
+  // Style filter selects when active
+  document.getElementById('filter-anbau')?.classList.toggle('filter-active', fAnbau!=='');
+  document.getElementById('filter-ernte')?.classList.toggle('filter-active', fErnte!=='');
+
+  // Apply filters
+  let list=S.pflanzen;
+  if(fAnbau!=='') list=list.filter(p=>p.anbauMonate?.includes(parseInt(fAnbau)));
+  if(fErnte!=='') list=list.filter(p=>p.ernteMonate?.includes(parseInt(fErnte)));
+
+  // Update count badge
+  const cnt=document.getElementById('pfl-count');
+  if(cnt) cnt.textContent = (fAnbau||fErnte) ? `${list.length} von ${S.pflanzen.length}` : `${S.pflanzen.length} Pflanzen`;
+
+  if(!list.length){g.innerHTML='';em.style.display='block';return}
+  em.style.display='none';
+  g.innerHTML=list.map(p=>`
+    <div class="pfl-card">
+      <div class="pfl-card-top">
+        <div><div class="pfl-name">${p.name}</div><div class="pfl-typ">${p.typ}</div></div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+          <span class="pfl-emoji">${p.emoji||'🌱'}</span>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-icon" onclick="openPflanzeModal('${p.id}')">✏️</button>
+            <button class="btn btn-danger btn-icon" onclick="deletePflanze('${p.id}',event)">🗑</button>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <div style="width:14px;height:14px;border-radius:50%;background:${p.color||COLORS[0]};flex-shrink:0"></div>
+        <span style="font-size:.72rem;color:var(--ink2)">Beetfarbe</span>
+        <span class="stat-badge">📐 <span>${p.zellenBedarf||1} Zelle${(p.zellenBedarf||1)>1?'n':''}</span></span>
+        <span class="stat-badge">🌱 <span>${p.pflanzenProQm||1}/Zelle</span></span>
+      </div>
+      <div>
+        <div style="font-size:.66rem;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Anbau & Ernte</div>
+        <div class="month-bars">${MN.map((_,i)=>{const a=p.anbauMonate?.includes(i),e=p.ernteMonate?.includes(i);return`<div class="mbar${a&&e?' ae':a?' a':e?' e':''}" style="height:${a||e?'100%':'35%'}" title="${MN[i]}"></div>`}).join('')}</div>
+        <div style="display:flex;gap:8px;margin-top:4px;font-size:.63rem;color:var(--ink2)">
+          <span><span style="display:inline-block;width:8px;height:8px;background:var(--green2);border-radius:2px;margin-right:3px"></span>Anbau</span>
+          <span><span style="display:inline-block;width:8px;height:8px;background:var(--amber);border-radius:2px;margin-right:3px"></span>Ernte</span>
+        </div>
+      </div>
+      ${p.pflege?`<div style="font-size:.78rem;color:var(--ink2);border-top:1px solid var(--border);padding-top:8px">💧 ${p.pflege}</div>`:''}
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// KALENDER — nutzt auto-aufgaben
+// ═══════════════════════════════════════════════════
+function buildAufgaben(){
+  const yr=new Date().getFullYear(),all=[];
+  S.beete.forEach(b=>{
+    if(!b.placements)return;
+    b.placements.forEach(pl=>{
+      const pfl=S.pflanzen.find(x=>x.id===pl.pflanzeId);
+      const anzahl=pl.rows*pl.cols*(pfl?.pflanzenProQm||1);
+      for(let m=pl.von;m<=pl.bis;m++){
+        all.push({
+          month:m,yr,beet:b.name,
+          pflanze:pfl?.name||'?',emoji:pfl?.emoji||'🌱',
+          aufgabe:getAufgabeForMonth(pl,m),
+          color:pfl?.color||COLORS[0],
+          anzahl,
+          flaeche:`${pl.cols*10}×${pl.rows*10} cm`
+        });
+      }
+    });
+  });
+  return all.sort((a,b)=>a.month-b.month);
+}
+function renderKalender(){
+  const c=document.getElementById('kal-content'),em=document.getElementById('kal-empty');
+  const all=buildAufgaben();
+  if(!all.length){c.innerHTML='';em.style.display='block';return}
+  em.style.display='none';
+  const byM={};all.forEach(a=>{(byM[a.month]=byM[a.month]||[]).push(a)});
+  c.innerHTML=Object.entries(byM).map(([m,list])=>`
+    <div class="kal-mgroup">
+      <div class="kal-mhead">📅 ${ML[m]} ${new Date().getFullYear()}</div>
+      ${list.map(a=>`<div class="kal-entry">
+        <div class="kal-emoji">${a.emoji}</div>
+        <div class="kal-info"><h4>${a.aufgabe}: ${a.pflanze}</h4><p>📍 ${a.beet} · 📐 ${a.flaeche} · 🌱 ${a.anzahl} Stk.</p></div>
+        <span class="tag ${TAG_CLS[a.aufgabe]||'tpf'}">${a.aufgabe}</span>
+      </div>`).join('')}
+    </div>`).join('');
+}
+function exportICS(){
+  const all=buildAufgaben();
+  if(!all.length){alert('Keine Aufgaben.');return}
+  const yr=new Date().getFullYear();
+  const lines=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Gartenplaner//DE','CALSCALE:GREGORIAN'];
+  all.forEach((a,i)=>{
+    const d=new Date(yr,a.month,1).toISOString().replace(/[-:]/g,'').slice(0,8);
+    const d2=new Date(yr,a.month+1,1).toISOString().replace(/[-:]/g,'').slice(0,8);
+    lines.push('BEGIN:VEVENT',`UID:gp-${Date.now()}-${i}@gp`,`DTSTART;VALUE=DATE:${d}`,`DTEND;VALUE=DATE:${d2}`,
+      `SUMMARY:${a.aufgabe}: ${a.pflanze} (${a.beet})`,
+      `DESCRIPTION:Beet: ${a.beet}\\nPflanze: ${a.pflanze}\\nAufgabe: ${a.aufgabe}\\nAnzahl: ${a.anzahl} Pflanzen\\nFläche: ${a.flaeche}`,
+      'CATEGORIES:Garten','END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  const blob=new Blob([lines.join('\r\n')],{type:'text/calendar'});
+  const url=URL.createObjectURL(blob);
+  Object.assign(document.createElement('a'),{href:url,download:'gartenplan.ics'}).click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+(async () => {
+  await load();
+  seed();
+  renderBeetSidebar();
+  renderPflanzen();
+  if (S.beete.length) { activeBeetId = S.beete[0].id; renderBeetView(); }
+})();
+</script>
+</body>
+</html>
