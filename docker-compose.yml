@@ -1,7 +1,6 @@
-version: '3.8'
-
 services:
   gartenplaner:
+    image: gartenplaner:latest
     build: .
     ports:
       - "8080:3000"

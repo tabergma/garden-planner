@@ -2,9 +2,10 @@ const http = require('http');
 const fs   = require('fs');
 const path = require('path');
 
-const PORT      = parseInt(process.env.PORT || '3000', 10);
-const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data', 'gartenplaner.json');
-const HTML_FILE = path.join(__dirname, 'gartenplaner.html');
+const PORT        = parseInt(process.env.PORT || '3000', 10);
+const DATA_FILE   = process.env.DATA_FILE || path.join(__dirname, 'data', 'gartenplaner.json');
+const HTML_FILE   = path.join(__dirname, 'gartenplaner.html');
+const PFLANZEN_FILE = path.join(__dirname, 'pflanzen.json');
 
 // Ensure data directory exists (important: runs at startup, after volume mount)
 try {
@@ -72,6 +73,19 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url === '/api/data') {
       const body = await collectBody(req);
       writeData(body, res);
+      return;
+    }
+
+    // GET /pflanzen.json → seed plant list (editable separately)
+    if (req.method === 'GET' && url === '/pflanzen.json') {
+      try {
+        const raw = fs.readFileSync(PFLANZEN_FILE, 'utf8');
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(raw);
+      } catch (e) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'pflanzen.json not found' }));
+      }
       return;
     }
 

@@ -11,7 +11,7 @@
   --ink:#1a1108;--ink2:#6b5c3e;--green:#4f8a5a;--green2:#7bb87e;
   --amber:#c4813e;--amber2:#e8b870;--red:#b84040;--border:#c8b990;
   --r:10px;--shadow:0 4px 24px rgba(30,15,0,.13);
-  --cpix:32;
+  --cpix:4;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);overflow:hidden}
@@ -71,6 +71,7 @@ nav{display:flex;gap:4px}
 
 /* EMPTY CELLS */
 .gcell{position:absolute;cursor:crosshair;z-index:2}
+.gcell-overlay{position:absolute;left:0;top:0;cursor:crosshair;z-index:1}
 .gcell-hover{position:absolute;inset:1px;background:rgba(79,138,90,.2);border:1.5px dashed var(--green);border-radius:3px;opacity:0;transition:opacity .15s;pointer-events:none}
 .gcell:hover .gcell-hover{opacity:1}
 
@@ -94,17 +95,30 @@ nav{display:flex;gap:4px}
 .badge-care{background:#505050;color:#fff}
 
 /* RESIZE HANDLE */
-.ptile-resize{
-  position:absolute;right:0;bottom:0;
-  width:14px;height:14px;cursor:se-resize;z-index:10;
-  display:flex;align-items:flex-end;justify-content:flex-end;
-  padding:2px;
+/* TOOLTIP — content source only (clipped inside canvas); global tooltip is shown via JS */
+.ptile-tooltip{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;pointer-events:none}
+/* Global tooltip: fixed, always on top, not clipped */
+.ptile-tooltip-global{
+  position:fixed;
+  left:0;top:0;
+  background:var(--soil);
+  color:var(--paper2);
+  font-size:.7rem;
+  padding:8px 12px;
+  border-radius:8px;
+  white-space:normal;
+  max-width:280px;
+  pointer-events:none;
+  z-index:9999;
+  line-height:1.45;
+  box-shadow:0 4px 20px rgba(0,0,0,.45);
+  border:1px solid rgba(0,0,0,.3);
+  text-align:left;
+  visibility:hidden;
+  opacity:0;
+  transition:opacity .15s ease, visibility .15s;
 }
-.ptile-resize::after{content:'';display:block;width:8px;height:8px;border-right:2px solid rgba(0,0,0,.5);border-bottom:2px solid rgba(0,0,0,.5)}
-
-/* TOOLTIP */
-.ptile-tooltip{position:absolute;bottom:calc(100%+5px);left:50%;transform:translateX(-50%);background:var(--soil);color:var(--paper2);font-size:.64rem;padding:4px 9px;border-radius:5px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:30;line-height:1.5}
-.ptile:hover .ptile-tooltip{opacity:1}
+.ptile-tooltip-global.is-visible{visibility:visible;opacity:1}
 
 /* DRAG GHOST */
 #drag-ghost{position:fixed;pointer-events:none;z-index:1000;border-radius:6px;opacity:.7;box-shadow:0 8px 28px rgba(0,0,0,.35);display:none;align-items:center;justify-content:center}
@@ -173,6 +187,10 @@ nav{display:flex;gap:4px}
 .cswatch.sel{border-color:var(--ink);transform:scale(1.2)}
 .info-box{background:var(--paper2);border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;font-size:.8rem;color:var(--ink2);line-height:1.5;margin-bottom:13px}
 .info-box strong{color:var(--green)}
+.modal-section-divider{border-top:1px solid var(--border);margin:14px 0;padding-top:14px}
+.place-row-options{display:flex;flex-direction:column;gap:6px}
+.place-row-opt{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.88rem}
+.place-row-opt input[type=radio]{flex-shrink:0}
 .empty-msg{text-align:center;padding:60px 20px;color:var(--ink2)}
 .empty-msg .e{font-size:2.5rem;margin-bottom:12px}
 
@@ -311,6 +329,7 @@ nav{display:flex;gap:4px}
               <div class="grid-cells" id="grid-cells"></div>
             </div>
           </div>
+          <div id="ptile-tooltip-global" class="ptile-tooltip-global" aria-hidden="true"></div>
         </div>
       </div>
     </div>
@@ -371,7 +390,8 @@ nav{display:flex;gap:4px}
       <div class="kal-scroll">
         <div class="kal-header">
           <h2>Aufgaben</h2>
-          <button class="btn btn-primary" onclick="exportICS()">📥 .ics Export</button>
+          <button class="btn btn-primary" onclick="exportICS()">📥 .ics</button>
+          <button class="btn btn-ghost" onclick="exportHTML()">📄 HTML mit Beetbildern</button>
         </div>
         <div id="kal-content"></div>
         <div class="empty-msg" id="kal-empty" style="display:none"><div class="e">📅</div><p>Keine Aufgaben vorhanden.</p></div>
@@ -415,14 +435,19 @@ nav{display:flex;gap:4px}
     <div class="fg"><label>Erntemonate</label><div class="mpicker" id="mper"></div></div>
     <div class="fg-row">
       <div class="fg">
-        <label>Pflanzen pro Zelle (10×10cm)</label>
-        <input id="ppqm" type="number" min="1" max="100" value="1" placeholder="1"/>
-        <div style="font-size:.7rem;color:var(--ink2);margin-top:3px">z.B. Karotten: 16, Tomaten: 1</div>
+        <label>Abstand zur nächsten Pflanze (cm)</label>
+        <input id="pabstand" type="number" min="5" max="200" value="25" placeholder="25"/>
+        <div style="font-size:.7rem;color:var(--ink2);margin-top:3px">z.B. Karotten 5–10, Tomaten 50–60</div>
       </div>
       <div class="fg">
-        <label>Platzbedarf (Zellen)</label>
-        <input id="pzel" type="number" min="1" max="100" value="1" placeholder="1"/>
-        <div style="font-size:.7rem;color:var(--ink2);margin-top:3px">z.B. Zucchini: 4, Tomate: 2</div>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="pinreihen" onchange="document.getElementById('pabstand-reihe-wrap').style.display=this.checked?'block':'none'"/>
+          In Reihen pflanzen
+        </label>
+        <div id="pabstand-reihe-wrap" style="display:none;margin-top:6px">
+          <label style="font-size:.75rem;color:var(--ink2)">Abstand zwischen Reihen (cm)</label>
+          <input id="pabstand-reihe" type="number" min="5" max="200" value="30" placeholder="30"/>
+        </div>
       </div>
     </div>
     <div class="fg"><label>Pflegehinweise</label><textarea id="pp" placeholder="Gießen, Düngen…"></textarea></div>
@@ -439,14 +464,30 @@ nav{display:flex;gap:4px}
     <h3 id="place-t">Pflanze setzen</h3>
     <div class="info-box" id="place-info"></div>
     <div class="fg"><label>Pflanze</label><select id="pl-pfl" onchange="updatePlaceHint()"></select></div>
-    <div class="space-hint" id="place-hint" style="display:none">
-      <span class="sh-icon">📐</span>
-      <div id="place-hint-text"></div>
+    <div class="modal-section-divider"></div>
+    <div id="place-quantity" style="display:none">
+      <div id="place-rows-wrap" style="display:none">
+        <div class="fg"><label>Anzahl Reihen</label><input id="pl-num-rows" type="number" min="1" max="50" value="2" onchange="updatePlaceSizeFromInputs()"/></div>
+        <p class="place-row-options-hint" style="font-size:.78rem;color:var(--ink2);margin:8px 0 6px 0">Reihenlänge: Wähle eine der folgenden Optionen.</p>
+        <div class="place-row-options">
+          <label class="place-row-opt"><input type="radio" name="pl-row-mode" value="manual" onchange="updatePlaceRowMode();updatePlaceSizeFromInputs()"/> <span>Anzahl Pflanzen pro Reihe</span></label>
+          <div id="place-rows-manual" class="fg" style="margin-left:24px;margin-top:4px"><input id="pl-plants-per-row" type="number" min="1" max="100" value="3" onchange="updatePlaceSizeFromInputs()"/></div>
+          <label class="place-row-opt"><input type="radio" name="pl-row-mode" value="one-h" onchange="updatePlaceRowMode();updatePlaceSizeFromInputs()"/> <span>Reihe horizontal</span> <span style="font-size:.72rem;color:var(--ink2)">(vom linken Beetrand bis zur nächsten Pflanzung)</span></label>
+          <label class="place-row-opt"><input type="radio" name="pl-row-mode" value="one-v" onchange="updatePlaceRowMode();updatePlaceSizeFromInputs()"/> <span>Reihe vertikal</span> <span style="font-size:.72rem;color:var(--ink2)">(vom oberen Beetrand bis zur nächsten Pflanzung)</span></label>
+        </div>
+      </div>
+      <div id="place-count-wrap" style="display:none" class="fg">
+        <label>Anzahl Pflanzen</label><input id="pl-num-plants" type="number" min="1" max="500" value="4" onchange="updatePlaceSizeFromInputs()"/>
+      </div>
+      <div id="place-size-result" style="font-size:.85rem;color:var(--ink2);margin-top:6px"></div>
     </div>
+    <div class="modal-section-divider"></div>
     <div class="fg-row">
-      <div class="fg"><label>Erster Monat (Säen/Pflanzen)</label><select id="pl-von"></select></div>
-      <div class="fg"><label>Letzter Monat (Ernte)</label><select id="pl-bis"></select></div>
+      <div class="fg"><label>Erster Monat (Säen/Pflanzen)</label><select id="pl-von" onchange="updatePlaceSizeFromInputs()"></select></div>
+      <div class="fg"><label>Letzter Monat (Ernte)</label><select id="pl-bis" onchange="updatePlaceSizeFromInputs()"></select></div>
     </div>
+    <p class="place-monat-hint" style="font-size:.75rem;color:var(--ink2);margin:-6px 0 8px 0">Für <em>diese</em> Fläche: Von wann bis wann steht die Pflanze hier? Wird automatisch aus den Pflanzendaten vorgefüllt; du kannst es anpassen (z. B. für Nachsaat).</p>
+    <div class="modal-section-divider"></div>
     <div class="info-box">
       <strong>Automatische Aufgaben:</strong><br>
       Erster Monat → <strong style="color:#2e7040">Säen</strong> oder <strong style="color:#1a5090">Pflanzen</strong><br>
@@ -458,6 +499,7 @@ nav{display:flex;gap:4px}
     </div>
     <div class="modal-acts">
       <button class="btn btn-ghost" onclick="closeModal('modal-place')">Abbrechen</button>
+      <button class="btn btn-ghost btn-sm" id="flip-btn" onclick="flipPlacement()" style="display:none" title="Fläche 90° drehen">↻ Drehen</button>
       <button class="btn btn-danger btn-sm" id="remove-btn" onclick="removePlacement()" style="display:none">🗑 Entfernen</button>
       <button class="btn btn-primary" onclick="savePlacement()">Platzieren</button>
     </div>
@@ -470,13 +512,14 @@ nav{display:flex;gap:4px}
 // ═══════════════════════════════════════════════════
 const MN=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 const ML=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-const CPIX=32; // px per 10cm cell
+const CPIX=4; // px per 1 cm (one cell = 1×1 cm)
+const EXPORT_CPIX=2; // smaller scale for exported bed images
 const COLORS=['#7cb87e','#e8b460','#e07070','#70a8e0','#b870d8','#d4c060','#60d4c0','#c0d460','#e07090','#8890e0'];
 const BADGE={Säen:'badge-sae',Pflanzen:'badge-pfl',Pflege:'badge-care',Ernte:'badge-ern'};
 const TAG_CLS={Säen:'ts',Pflanzen:'tp',Ernte:'te',Pflege:'tpf'};
 
 let S={beete:[],pflanzen:[]};
-let activeBeetId=null, activeMonth=0, playInterval=null;
+let activeBeetId=null, activeMonth=12, playInterval=null; // 12 = Ganzjahr (default view)
 let editBeetId=null, editPflId=null, selColor=COLORS[0];
 let editPlacementId=null, editCellSeed=null; // for place modal
 
@@ -526,6 +569,22 @@ async function load() {
           }
         });
         delete b.pl;
+      }
+    });
+    // migrate 10cm cells → 1cm cells: if grid was in 10cm units, multiply r,c,rows,cols by 10
+    S.beete.forEach(b => {
+      const w = Number(b.w) || 200, h = Number(b.h) || 100;
+      const oldCols = Math.ceil(w / 10), oldRows = Math.ceil(h / 10);
+      if (!b.placements.length) return;
+      const maxC = Math.max(...b.placements.map(p => (p.c || 0) + (p.cols || 1)));
+      const maxR = Math.max(...b.placements.map(p => (p.r || 0) + (p.rows || 1)));
+      if (maxC <= oldCols + 1 && maxR <= oldRows + 1) {
+        b.placements.forEach(pl => {
+          pl.r = (pl.r || 0) * 10;
+          pl.c = (pl.c || 0) * 10;
+          pl.rows = (pl.rows || 1) * 10;
+          pl.cols = (pl.cols || 1) * 10;
+        });
       }
     });
   } catch (e) {
@@ -591,22 +650,30 @@ function buildSwatches(cur){
 function pickColor(c,el){selColor=c;document.querySelectorAll('.cswatch').forEach(s=>s.classList.remove('sel'));el.classList.add('sel')}
 
 // ═══════════════════════════════════════════════════
-// SEED DATA
+// SEED DATA — loaded from pflanzen.json (id added when merging)
 // ═══════════════════════════════════════════════════
+let SEED_PFLANZEN = [];
 function seed(){
-  if(S.pflanzen.length)return;
-  S.pflanzen=[
-    {id:uid(),name:'Tomaten',    emoji:'🍅',typ:'Gemüse',color:COLORS[0],anbauMonate:[3,4],  ernteMonate:[6,7,8,9],  pflege:'Ausgeizen, viel Wasser',   pflanzenProQm:1,  zellenBedarf:2},
-    {id:uid(),name:'Karotten',   emoji:'🥕',typ:'Gemüse',color:COLORS[1],anbauMonate:[2,3,4], ernteMonate:[6,7,8],   pflege:'Vereinzeln bei 3cm',        pflanzenProQm:16, zellenBedarf:1},
-    {id:uid(),name:'Basilikum',  emoji:'🌿',typ:'Kräuter',color:COLORS[7],anbauMonate:[3,4,5], ernteMonate:[5,6,7,8,9],pflege:'Sonnig, nicht zu nass',   pflanzenProQm:4,  zellenBedarf:1},
-    {id:uid(),name:'Zucchini',   emoji:'🥒',typ:'Gemüse',color:COLORS[2],anbauMonate:[4,5],   ernteMonate:[6,7,8,9],  pflege:'Viel Platz & Wasser',       pflanzenProQm:1,  zellenBedarf:6},
-    {id:uid(),name:'Erdbeeren',  emoji:'🍓',typ:'Obst',  color:COLORS[3],anbauMonate:[2,3,9],  ernteMonate:[5,6,7],   pflege:'Ausläufer entfernen',       pflanzenProQm:4,  zellenBedarf:1},
-    {id:uid(),name:'Salat',      emoji:'🥬',typ:'Gemüse',color:COLORS[4],anbauMonate:[2,3,4,8],ernteMonate:[4,5,9,10],pflege:'Gleichmäßig feucht halten', pflanzenProQm:4,  zellenBedarf:1},
-    {id:uid(),name:'Kürbis',     emoji:'🎃',typ:'Gemüse',color:COLORS[1],anbauMonate:[4,5],   ernteMonate:[9,10],     pflege:'Ranken führen, viel Platz', pflanzenProQm:1,  zellenBedarf:12},
-    {id:uid(),name:'Radieschen', emoji:'🌰',typ:'Gemüse',color:COLORS[8],anbauMonate:[2,3,4,8],ernteMonate:[4,5,6,9,10],pflege:'Locker säen, dünn halten',pflanzenProQm:16, zellenBedarf:1},
-    {id:uid(),name:'Chicoree Etardo',emoji:'🥗',typ:'Gemüse',color:COLORS[6],anbauMonate:[4,8,9],ernteMonate:[9,10,11],pflege:'Saattiefe 1cm, Reihenabstand 40cm, Pflanzenabstand 10cm. Keimfähigkeit 83%.',pflanzenProQm:1,zellenBedarf:4},
-  ];
-  save();
+  if (S.pflanzen.length === 0) {
+    S.pflanzen = SEED_PFLANZEN.map(p => ({ ...p, id: uid() }));
+    save();
+    _flushSave(); // persist immediately so data survives refresh before debounce
+    return;
+  }
+  const existingNames = new Set(S.pflanzen.map(p => (p && p.name) ? p.name : ''));
+  let added = 0;
+  for (const p of SEED_PFLANZEN) {
+    if (!p || !p.name) continue;
+    if (!existingNames.has(p.name)) {
+      S.pflanzen.push({ ...p, id: uid() });
+      existingNames.add(p.name);
+      added++;
+    }
+  }
+  if (added) {
+    save();
+    _flushSave(); // persist immediately so server has full list on next load
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -665,7 +732,7 @@ function showBeetEmpty(){
 // BEET VIEW
 // ═══════════════════════════════════════════════════
 function selectBeet(id){
-  activeBeetId=id;activeMonth=0;stopPlay();
+  activeBeetId=id;activeMonth=ALL_YEAR_MONTH;stopPlay();
   renderBeetSidebar();renderBeetView();
 }
 function renderBeetView(){
@@ -676,37 +743,39 @@ function renderBeetView(){
   renderMonthTabs(b);
   renderCanvas(b,activeMonth);
 }
+const ALL_YEAR_MONTH=12; // special value for "all year" view (default)
 function renderMonthTabs(b){
   const bar=document.getElementById('mtabs');
-  const hasPl=m=>b.placements&&b.placements.some(p=>m>=p.von&&m<=p.bis);
-  bar.innerHTML=MN.map((m,i)=>`
+  const hasPl=m=>m===ALL_YEAR_MONTH?!!(b.placements&&b.placements.length):b.placements&&b.placements.some(p=>m>=p.von&&m<=p.bis);
+  bar.innerHTML=`<div class="mtab${activeMonth===ALL_YEAR_MONTH?' active':''}${hasPl(ALL_YEAR_MONTH)?' has-p':''}" onclick="switchMonth(${ALL_YEAR_MONTH})">📅 Jahresansicht</div>`;
+  bar.innerHTML+=MN.map((m,i)=>`
     <div class="mtab${i===activeMonth?' active':''}${hasPl(i)?' has-p':''}" onclick="switchMonth(${i})">${m}</div>
   `).join('');
   bar.innerHTML+=`<div class="mcontrols"><button class="play-btn${playInterval?' playing':''}" id="playbtn" onclick="togglePlay()">${playInterval?'⏹ Stop':'▶ Zeitraffer'}</button></div>`;
-  document.getElementById('tbar').style.width=((activeMonth/11)*100)+'%';
+  document.getElementById('tbar').style.width=activeMonth===ALL_YEAR_MONTH?'100%':((activeMonth/11)*100)+'%';
 }
 function switchMonth(m){
   activeMonth=m;
   const b=S.beete.find(x=>x.id===activeBeetId);
-  if(b){renderMonthTabs(b);renderCanvas(b,m)}
+  if(b){renderMonthTabs(b);renderCanvas(b,m);}
 }
 
 // ═══════════════════════════════════════════════════
 // CANVAS RENDER
 // ═══════════════════════════════════════════════════
 function renderCanvas(b,month){
-  const cols=Math.ceil(b.w/10), rows=Math.ceil(b.h/10);
+  const cols=Math.floor(Number(b.w))||200, rows=Math.floor(Number(b.h))||100;
   const wrap=document.getElementById('canvas-wrap');
   const cells=document.getElementById('grid-cells');
   wrap.style.width=(cols*CPIX)+'px';wrap.style.height=(rows*CPIX)+'px';
   cells.style.width=(cols*CPIX)+'px';cells.style.height=(rows*CPIX)+'px';
 
-  // SVG GRID
+  // SVG GRID: one cell = 1 cm; draw lines every 10 cm, labels every 50 cm
   let svg=`<svg class="grid-svg" width="${cols*CPIX}" height="${rows*CPIX}" xmlns="http://www.w3.org/2000/svg">`;
-  for(let c=0;c<=cols;c++){const t=c%10===0;svg+=`<line x1="${c*CPIX}" y1="0" x2="${c*CPIX}" y2="${rows*CPIX}" stroke="rgba(160,140,90,${t?.45:.18})" stroke-width="${t?1.5:1}"/>`}
-  for(let r=0;r<=rows;r++){const t=r%10===0;svg+=`<line x1="0" y1="${r*CPIX}" x2="${cols*CPIX}" y2="${r*CPIX}" stroke="rgba(160,140,90,${t?.45:.18})" stroke-width="${t?1.5:1}"/>`}
-  for(let c=0;c<=cols;c+=5)svg+=`<text x="${c*CPIX+2}" y="9" font-size="6.5" fill="rgba(100,80,40,.5)" font-family="DM Sans">${c*10}</text>`;
-  for(let r=1;r<=rows;r+=5)svg+=`<text x="2" y="${r*CPIX-2}" font-size="6.5" fill="rgba(100,80,40,.5)" font-family="DM Sans">${r*10}</text>`;
+  for(let c=0;c<=cols;c+=10){const t=c%50===0;svg+=`<line x1="${c*CPIX}" y1="0" x2="${c*CPIX}" y2="${rows*CPIX}" stroke="rgba(160,140,90,${t?0.5:0.2})" stroke-width="${t?1.5:1}"/>`}
+  for(let r=0;r<=rows;r+=10){const t=r%50===0;svg+=`<line x1="0" y1="${r*CPIX}" x2="${cols*CPIX}" y2="${r*CPIX}" stroke="rgba(160,140,90,${t?0.5:0.2})" stroke-width="${t?1.5:1}"/>`}
+  for(let c=0;c<=cols;c+=50)svg+=`<text x="${c*CPIX+2}" y="10" font-size="7" fill="rgba(100,80,40,.6)" font-family="DM Sans">${c}</text>`;
+  for(let r=50;r<=rows;r+=50)svg+=`<text x="2" y="${r*CPIX-2}" font-size="7" fill="rgba(100,80,40,.6)" font-family="DM Sans">${r}</text>`;
   svg+='</svg>';
   const old=wrap.querySelector('.grid-svg');if(old)old.remove();
   wrap.insertAdjacentHTML('afterbegin',svg);
@@ -715,21 +784,22 @@ function renderCanvas(b,month){
   // Occupied cells set (for empty cell targets)
   const occupied=new Set();
 
-  // Render placements visible in this month
+  // Render placements: in "Ganzjahr" view show all, otherwise only for this month
+  const allYearView=month===ALL_YEAR_MONTH;
   if(b.placements){
     b.placements.forEach(pl=>{
-      if(month<pl.von||month>pl.bis)return;
+      if(!allYearView&&(month<pl.von||month>pl.bis))return;
       const pfl=S.pflanzen.find(x=>x.id===pl.pflanzeId);
       if(!pfl)return;
 
       // Mark cells occupied
       for(let dr=0;dr<pl.rows;dr++)for(let dc=0;dc<pl.cols;dc++)occupied.add(`${pl.r+dr},${pl.c+dc}`);
 
-      // Growth animation
-      const progress=pl.bis>pl.von?(month-pl.von)/(pl.bis-pl.von):1;
+      // Growth: in Ganzjahr use middle; otherwise by month
+      const progress=allYearView?0.5:(pl.bis>pl.von?(month-pl.von)/(pl.bis-pl.von):1);
       const scale=0.65+0.35*progress;
       const alpha=Math.round((0.55+0.45*progress)*255).toString(16).padStart(2,'0');
-      const aufgabe=getAufgabeForMonth(pl,month);
+      const aufgabe=allYearView?'–':getAufgabeForMonth(pl,month);
       const w=pl.cols*CPIX-2, h=pl.rows*CPIX-2;
 
       const tile=document.createElement('div');
@@ -737,10 +807,24 @@ function renderCanvas(b,month){
       tile.dataset.plId=pl.id;
       tile.style.cssText=`left:${pl.c*CPIX+1}px;top:${pl.r*CPIX+1}px;width:${w}px;height:${h}px;background:${pfl.color||COLORS[0]}${alpha}`;
 
-      const emojiSize=Math.min(1.4, Math.max(0.7, (Math.min(w,h)/CPIX)*0.85))+'rem';
-      const totalPflanzen=pl.rows*pl.cols*(pfl.pflanzenProQm||1);
-      const showLabel=Math.min(w,h)>CPIX*1.5;
-      const showCount=Math.min(w,h)>CPIX*0.9; // show count chip if tile is big enough
+      const emojiSize=Math.min(1.4, Math.max(0.7, (Math.min(pl.cols,pl.rows))*0.08))+'rem';
+      const totalPflanzen=plantsFromArea(pl.rows,pl.cols,getPflanzenProQm(pfl));
+      const showLabel=Math.min(pl.cols,pl.rows)>=8; // show name from ~8 cm
+      const showCount=Math.min(pl.cols,pl.rows)>=5; // show count from ~5 cm
+      const nichtNachbarn=getNichtNachbarn(pfl);
+      const nachbarnLine=Array.isArray(nichtNachbarn)&&nichtNachbarn.length?`<br>⚠️ Nicht neben: ${nichtNachbarn.join(', ')}`:'';
+      let conflictNames=[];
+      if(Array.isArray(nichtNachbarn)&&nichtNachbarn.length&&b.placements){
+        b.placements.forEach(other=>{
+          if(other.id===pl.id)return;
+          if(other.von>pl.bis||other.bis<pl.von)return;
+          const opfl=S.pflanzen.find(x=>x.id===other.pflanzeId);
+          if(opfl&&nichtNachbarn.includes(opfl.name)&&!conflictNames.includes(opfl.name)) conflictNames.push(opfl.name);
+        });
+      }
+      const conflictLine=conflictNames.length?`<br>⚠️ Im Beet: ${conflictNames.join(', ')} (ungünstig)`:'';
+      const spacingLine=getSpacingLabel(pfl)!=='–'?` · 📐 ${getSpacingDisplayText(pfl)}`:'';
+      const tooltipHtml=`${pfl.emoji} ${pfl.name}<br>${MN[pl.von]}–${MN[pl.bis]} · ${aufgabe}<br>🌱 ${totalPflanzen} Pflanze${totalPflanzen!==1?'n':''} · ${pl.cols}×${pl.rows} cm${spacingLine}${nachbarnLine}${conflictLine}`;
       tile.innerHTML=`
         <div class="ptile-inner">
           <span class="ptile-emoji" style="font-size:${emojiSize}">${pfl.emoji||'🌱'}</span>
@@ -748,9 +832,24 @@ function renderCanvas(b,month){
           <span class="ptile-badge ${BADGE[aufgabe]||'badge-care'}">${aufgabe[0]}</span>
           ${showCount?`<span class="ptile-count">${totalPflanzen}×</span>`:''}
         </div>
-        <div class="ptile-tooltip">${pfl.emoji} ${pfl.name}<br>${MN[pl.von]}–${MN[pl.bis]} · ${aufgabe}<br>🌱 ${totalPflanzen} Pflanze${totalPflanzen!==1?'n':''} · 📐 ${pl.cols*10}×${pl.rows*10} cm</div>
-        <div class="ptile-resize" data-resize="${pl.id}" title="Größe ziehen"></div>
+        <div class="ptile-tooltip">${tooltipHtml}</div>
       `;
+
+      // Global tooltip on hover (fixed position so it is never clipped)
+      const gTip=document.getElementById('ptile-tooltip-global');
+      if(gTip){
+        tile.addEventListener('mouseenter',function(e){
+          gTip.innerHTML=tooltipHtml;
+          const rect=tile.getBoundingClientRect();
+          gTip.style.left=(rect.left+rect.width/2)+'px';
+          gTip.style.top=(rect.bottom+8)+'px';
+          gTip.style.transform='translateX(-50%)';
+          gTip.classList.add('is-visible');
+        });
+        tile.addEventListener('mouseleave',function(){
+          gTip.classList.remove('is-visible');
+        });
+      }
 
       // Delete button — inline confirm, no browser dialog
       const delBtn = document.createElement('div');
@@ -795,26 +894,24 @@ function renderCanvas(b,month){
 
       // DRAG TO MOVE
       setupDragMove(tile, pl, b, cols, rows);
-      // DRAG TO RESIZE
-      setupDragResize(tile.querySelector('.ptile-resize'), pl, b, cols, rows);
 
       cells.appendChild(tile);
     });
   }
 
-  // Empty cell click targets
-  const maxR=rows, maxC=cols;
-  for(let r=0;r<maxR;r++){
-    for(let c=0;c<maxC;c++){
-      if(occupied.has(`${r},${c}`))continue;
-      const cell=document.createElement('div');
-      cell.className='gcell';
-      cell.style.cssText=`left:${c*CPIX}px;top:${r*CPIX}px;width:${CPIX}px;height:${CPIX}px`;
-      cell.innerHTML='<div class="gcell-hover"></div>';
-      cell.addEventListener('click',()=>openPlaceModal(r,c,null));
-      cells.appendChild(cell);
-    }
-  }
+  // Single overlay for empty-area clicks (1 cell = 1 cm; no 20k divs)
+  const overlay=document.createElement('div');
+  overlay.className='gcell-overlay';
+  overlay.style.cssText=`position:absolute;left:0;top:0;width:${cols*CPIX}px;height:${rows*CPIX}px;cursor:crosshair;z-index:1`;
+  overlay.addEventListener('click',e=>{
+    const rect=cells.getBoundingClientRect();
+    const x=e.clientX-rect.left,y=e.clientY-rect.top;
+    const c=Math.floor(x/CPIX),r=Math.floor(y/CPIX);
+    if(c<0||c>=cols||r<0||r>=rows)return;
+    if(occupied.has(`${r},${c}`))return;
+    openPlaceModal(r,c,null);
+  });
+  cells.appendChild(overlay);
 }
 
 // ═══════════════════════════════════════════════════
@@ -865,64 +962,77 @@ function setupDragMove(tile, pl, b, maxCols, maxRows){
 }
 
 // ═══════════════════════════════════════════════════
-// DRAG: RESIZE TILE
-// ═══════════════════════════════════════════════════
-function setupDragResize(handle, pl, b, maxCols, maxRows){
-  let resizing=false, startX, startY, startRows, startCols;
-
-  handle.addEventListener('mousedown', e=>{
-    if(e.button!==0)return;
-    e.preventDefault();e.stopPropagation();
-    resizing=true;startX=e.clientX;startY=e.clientY;
-    startRows=pl.rows;startCols=pl.cols;
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  });
-
-  function onMove(e){
-    if(!resizing)return;
-    const dx=e.clientX-startX, dy=e.clientY-startY;
-    const dc=Math.round(dx/CPIX), dr=Math.round(dy/CPIX);
-    const newRows=Math.max(1,Math.min(maxRows-pl.r, startRows+dr));
-    const newCols=Math.max(1,Math.min(maxCols-pl.c, startCols+dc));
-    if(!checkOverlap(b,pl.id,pl.r,pl.c,newRows,newCols,pl.von,pl.bis)){
-      pl.rows=newRows;pl.cols=newCols;
-      // live update tile size
-      const tile=document.querySelector(`.ptile[data-pl-id="${pl.id}"]`);
-      if(tile){
-        tile.style.width=(newCols*CPIX-2)+'px';
-        tile.style.height=(newRows*CPIX-2)+'px';
-      }
-    }
-  }
-  function onUp(){
-    if(!resizing)return;
-    resizing=false;
-    document.removeEventListener('mousemove',onMove);
-    document.removeEventListener('mouseup',onUp);
-    save();
-    renderCanvas(b,activeMonth);
-  }
-}
-
-// ═══════════════════════════════════════════════════
 // OVERLAP CHECK — respects both space AND time
 // von/bis optional: if provided, only conflicts with placements
-// whose month range overlaps. Omit for drag-move/resize (keeps own range).
+// whose month range overlaps. Omit for drag-move (keeps own range).
 // ═══════════════════════════════════════════════════
 function checkOverlap(b, excludeId, r, c, rows, cols, von, bis){
   if(!b.placements) return false;
   for(const pl of b.placements){
     if(pl.id === excludeId) continue;
-    // spatial intersection?
     if(!(r < pl.r+pl.rows && r+rows > pl.r && c < pl.c+pl.cols && c+cols > pl.c)) continue;
-    // time intersection? (only block if months actually overlap)
     if(von !== undefined && bis !== undefined){
-      if(bis < pl.von || von > pl.bis) continue; // no time overlap → no conflict
+      if(bis < pl.von || von > pl.bis) continue;
     }
     return true;
   }
   return false;
+}
+// Returns overlapping placements (with plant names) for a given area and time range
+function getOverlappingPlacements(b, excludeId, r, c, rows, cols, von, bis){
+  if(!b.placements) return [];
+  const out=[];
+  for(const pl of b.placements){
+    if(pl.id===excludeId)continue;
+    if(!(r<pl.r+pl.rows&&r+rows>pl.r&&c<pl.c+pl.cols&&c+cols>pl.c))continue;
+    if(von!==undefined&&bis!==undefined&&(bis<pl.von||von>pl.bis))continue;
+    const pfl=S.pflanzen.find(x=>x.id===pl.pflanzeId);
+    out.push({pl,name:pfl?pfl.name:'?'});
+  }
+  return out;
+}
+// Max columns usable from left border at row row (no overlap with placements in von–bis)
+function getAvailableSpaceFromLeft(b, row, von, bis, maxCols, maxRows){
+  if(!b.placements) return maxCols;
+  let blockAt=maxCols;
+  for(const pl of b.placements){
+    if(bis<pl.von||von>pl.bis) continue;
+    if(!(row<pl.r+pl.rows&&pl.r<row+1)) continue;
+    if(pl.c<blockAt) blockAt=pl.c;
+  }
+  return blockAt;
+}
+// Max rows usable from top border at col col (no overlap with placements in von–bis)
+function getAvailableSpaceFromTop(b, col, von, bis, maxCols, maxRows){
+  if(!b.placements) return maxRows;
+  let blockAt=maxRows;
+  for(const pl of b.placements){
+    if(bis<pl.von||von>pl.bis) continue;
+    if(!(col<pl.c+pl.cols&&pl.c<col+1)) continue;
+    if(pl.r<blockAt) blockAt=pl.r;
+  }
+  return blockAt;
+}
+// First (r,c) in bed where rectangle recRows×recCols fits and does not overlap (von–bis). Row-major order.
+function findFirstFittingPosition(b, recRows, recCols, von, bis, maxCols, maxRows){
+  for(let r=0;r<=maxRows-recRows;r++)
+    for(let c=0;c<=maxCols-recCols;c++)
+      if(!checkOverlap(b,null,r,c,recRows,recCols,von,bis)) return {r,c};
+  return null;
+}
+// First position in bed (row-major) where the area fits in either normal or rotated (90°) orientation. Returns {r,c,recRows,recCols} or null.
+function findFirstFittingPositionWithRotation(b, sizeRows, sizeCols, von, bis, maxCols, maxRows){
+  const maxR=maxRows-Math.max(sizeRows,sizeCols), maxC=maxCols-Math.max(sizeRows,sizeCols);
+  if(maxR<0||maxC<0) return null;
+  for(let r=0;r<=maxR;r++){
+    for(let c=0;c<=maxC;c++){
+      if(r+sizeRows<=maxRows&&c+sizeCols<=maxCols&&!checkOverlap(b,null,r,c,sizeRows,sizeCols,von,bis))
+        return {r,c,recRows:sizeRows,recCols:sizeCols};
+      if(sizeRows!==sizeCols&&r+sizeCols<=maxRows&&c+sizeRows<=maxCols&&!checkOverlap(b,null,r,c,sizeCols,sizeRows,von,bis))
+        return {r,c,recRows:sizeCols,recCols:sizeRows};
+    }
+  }
+  return null;
 }
 
 // ═══════════════════════════════════════════════════
@@ -936,13 +1046,15 @@ function openPlaceModal(row, col, plId){
 
   document.getElementById('place-t').textContent=ex?'Platzierung bearbeiten':'Pflanze setzen';
   document.getElementById('place-info').textContent=ex
-    ?`Fläche: ${ex.cols*10}×${ex.rows*10} cm (${ex.cols*ex.rows} Zellen · ${calcPflanzenCount(ex)} Pflanzen)`
-    :`Position: ${col*10} / ${row*10} cm`;
+    ?`Fläche: ${ex.cols}×${ex.rows} cm · ${calcPflanzenCount(ex)} Pflanzen`
+    :`Position: ${col} / ${row} cm`;
   document.getElementById('remove-btn').style.display=ex?'inline-flex':'none';
+  document.getElementById('flip-btn').style.display=ex?'inline-flex':'none';
 
   const pSel=document.getElementById('pl-pfl');
-  pSel.innerHTML=S.pflanzen.length
-    ?S.pflanzen.map(p=>`<option value="${p.id}"${ex?.pflanzeId===p.id?' selected':''}>${p.emoji} ${p.name}</option>`).join('')
+  const pflSorted=[...S.pflanzen].sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+  pSel.innerHTML=pflSorted.length
+    ?pflSorted.map(p=>`<option value="${p.id}"${ex?.pflanzeId===p.id?' selected':''}>${p.emoji} ${p.name}</option>`).join('')
     :'<option value="">Keine Pflanzen vorhanden — erst anlegen!</option>';
 
   if(ex&&ex.startAufgabe) document.getElementById('pl-start').value=ex.startAufgabe;
@@ -957,74 +1069,352 @@ function openPlaceModal(row, col, plId){
   openModal('modal-place');
 }
 
-// Calculates total plant count for a placement
+// Area in m²: each cell = 1×1 cm, so rows*cols cm² = (rows*cols)/10000 m²
+function areaM2(rows,cols){return (rows*cols)/10000;}
+// Plant count from area (m²) × plants per m²; at least 1 if placement exists
+function plantsFromArea(rows,cols,pflanzenProQm){
+  const pqm=Number(pflanzenProQm)||1;
+  const n=Math.round(areaM2(rows,cols)*pqm);
+  return Math.max(1,n);
+}
+// Spacing-based: plants/m² = 10000 / (abstandPflanze * abstandReihe), rowDist = inReihen ? abstandReihe : abstandPflanze
+function getPflanzenProQm(p){
+  if(!p)return 1;
+  const a=Number(p.abstandPflanze);
+  if(!(a>0))return Number(p.pflanzenProQm)||1;
+  const rowDist=p.inReihen&&p.abstandReihe!=null&&p.abstandReihe!=='' ? Number(p.abstandReihe) : a;
+  const b=rowDist>0?rowDist:a;
+  return 10000/(a*b);
+}
+// Minimum cells for one plant at this spacing (cell = 1×1 cm)
+function getZellenBedarf(p){
+  if(!p)return 1;
+  const a=Number(p.abstandPflanze);
+  if(!(a>0))return Math.max(1,parseInt(p.zellenBedarf,10)||1);
+  const rowDist=p.inReihen&&p.abstandReihe!=null&&p.abstandReihe!=='' ? Number(p.abstandReihe) : a;
+  const b=rowDist>0?rowDist:a;
+  return Math.ceil(a)*Math.ceil(b);
+}
+function getPlaceHintRec(p){
+  const z=getZellenBedarf(p);
+  const a=Number(p?.abstandPflanze);
+  const rowDist=p?.inReihen&&p?.abstandReihe!=null&&p?.abstandReihe!=='' ? Number(p.abstandReihe) : a;
+  const b=rowDist>0?rowDist:a;
+  const recCols=a>0?Math.ceil(a):Math.ceil(Math.sqrt(z));
+  const recRows=(a>0&&b>0)?Math.ceil(b):Math.max(1,Math.ceil(z/recCols));
+  return { recCols: Math.max(1,recCols), recRows: Math.max(1,recRows) };
+}
+// Numeric spacing for calculations (with seed fallback)
+function getSpacingNumeric(p){
+  if(!p)return {a:25,b:25,inReihen:false};
+  let a=Number(p.abstandPflanze), inReihen=!!(p.inReihen&&p.abstandReihe!=null&&p.abstandReihe!=='');
+  let b=inReihen?Number(p.abstandReihe):a;
+  const hasSpacing=a>0;
+  if(!hasSpacing&&p.name){const seed=SEED_PFLANZEN.find(s=>s&&s.name===p.name);if(seed){a=Number(seed.abstandPflanze)||25;inReihen=!!(seed.inReihen&&seed.abstandReihe!=null);b=inReihen?(Number(seed.abstandReihe)||a):a;}}
+  if(!(a>0))a=25;if(!(b>0))b=a;
+  return {a,b,inReihen};
+}
+// Compute placement size from "rows + plants per row" (for inReihen)
+function computeSizeFromRows(p,numRows,plantsPerRow){
+  const {a,b}=getSpacingNumeric(p);
+  const recCols=Math.max(1,Math.ceil(plantsPerRow*a));
+  const recRows=Math.max(1,Math.ceil(numRows*b));
+  return {recCols,recRows};
+}
+// Compute placement size from "number of plants" (for single/quadrat)
+function computeSizeFromCount(p,numPlants){
+  const pqm=getPflanzenProQm(p);
+  const areaCm2=(numPlants/pqm)*10000;
+  const side=Math.ceil(Math.sqrt(areaCm2));
+  const recCols=Math.max(1,side);
+  const recRows=Math.max(1,side);
+  return {recCols,recRows};
+}
+// Display: Abstand (cm) and Reihen/Quadrat — used everywhere instead of /m² and Zellen
+function getSpacingLabel(p){
+  if(!p)return '–';
+  const a=Number(p.abstandPflanze);
+  if(a>0){
+    if(p.inReihen&&p.abstandReihe!=null&&p.abstandReihe!=='')return `${a}×${Number(p.abstandReihe)} cm`;
+    return `${a} cm`;
+  }
+  const pqm=Number(p.pflanzenProQm)||1;
+  const approx=Math.round(100/Math.sqrt(pqm));
+  return '~'+Math.max(5,approx)+' cm';
+}
+function getAnordnungLabel(p){
+  if(!p)return '';
+  const a=Number(p.abstandPflanze);
+  if(!(a>0))return (Number(p.pflanzenProQm)||1)>=20?'Reihe':'Quadrat';
+  return p.inReihen&&p.abstandReihe!=null&&p.abstandReihe!=='' ? 'Reihe' : 'Quadrat';
+}
+// Full spacing text including Reihenabstand when in rows (for placement hint / tooltip)
+function getSpacingDisplayText(p){
+  if(!p)return '–';
+  const a=Number(p.abstandPflanze);
+  if(a>0){
+    if(p.inReihen&&p.abstandReihe!=null&&p.abstandReihe!==''){
+      const re=Number(p.abstandReihe);
+      return `Pflanzenabstand: ${a} cm · Reihenabstand: ${re} cm`;
+    }
+    return `Abstand: ${a} cm`;
+  }
+  const pqm=Number(p.pflanzenProQm)||1;
+  const approx=Math.round(100/Math.sqrt(pqm));
+  return 'Abstand: ~'+Math.max(5,approx)+' cm';
+}
+// Three separate values for the plant card (use seed by name if plant has no spacing)
+function getAbstandPflanzeCm(p){
+  if(!p)return '–';
+  let a=Number(p.abstandPflanze);
+  if(!(a>0)&&p.name){const seed=SEED_PFLANZEN.find(s=>s&&s.name===p.name);if(seed&&Number(seed.abstandPflanze)>0)a=Number(seed.abstandPflanze);}
+  if(a>0)return String(a);
+  const pqm=Number(p.pflanzenProQm)||1;
+  return '~'+Math.max(5,Math.round(100/Math.sqrt(pqm)));
+}
+function getInReihenDisplay(p){
+  if(!p)return '–';
+  const hasSpacing=Number(p.abstandPflanze)>0;
+  let inReihen=p.inReihen, re=p.abstandReihe;
+  if(!hasSpacing&&p.name){const seed=SEED_PFLANZEN.find(s=>s&&s.name===p.name);if(seed){inReihen=seed.inReihen;re=seed.abstandReihe;}}
+  if(inReihen&&re!=null&&re!=='')return 'Ja';
+  if(hasSpacing)return 'Nein';
+  if(p.name){const seed=SEED_PFLANZEN.find(s=>s&&s.name===p.name);if(seed&&Number(seed.abstandPflanze)>0)return (seed.inReihen&&seed.abstandReihe!=null&&seed.abstandReihe!=='')?'Ja':'Nein';}
+  return (Number(p.pflanzenProQm)||1)>=20?'Ja':'Nein';
+}
+function getAbstandReiheCm(p){
+  if(!p)return '–';
+  let inReihen=p.inReihen, re=p.abstandReihe;
+  const hasSpacing=Number(p.abstandPflanze)>0;
+  if(!hasSpacing&&p.name){const seed=SEED_PFLANZEN.find(s=>s&&s.name===p.name);if(seed){inReihen=seed.inReihen;re=seed.abstandReihe;}}
+  if(!inReihen||re==null||re==='')return '–';
+  const num=Number(re);
+  if(!(num>=0))return '–';
+  return String(num);
+}
+// Unfavorable neighbours: from plant or seed by name
+function getNichtNachbarn(p){
+  if(!p||!p.name)return [];
+  if(Array.isArray(p.nichtNachbarn)&&p.nichtNachbarn.length)return p.nichtNachbarn;
+  const seed=SEED_PFLANZEN.find(s=>s&&s.name===p.name);
+  return (seed&&Array.isArray(seed.nichtNachbarn))?seed.nichtNachbarn:[];
+}
 function calcPflanzenCount(pl){
   const pfl=S.pflanzen.find(x=>x.id===pl.pflanzeId);
   if(!pfl)return '?';
-  const cells=pl.rows*pl.cols;
-  const total=cells*( pfl.pflanzenProQm||1);
-  return total;
+  return plantsFromArea(pl.rows,pl.cols,getPflanzenProQm(pfl));
 }
 
-// Updates the space hint in the placement modal based on selected plant
+// Updates the placement modal: show rows/plants-per-row or number-of-plants, and compute size
 function updatePlaceHint(){
   const sel=document.getElementById('pl-pfl').value;
-  const hint=document.getElementById('place-hint');
-  const htext=document.getElementById('place-hint-text');
-  if(!sel){hint.style.display='none';return}
+  const quantityEl=document.getElementById('place-quantity');
+  const rowsWrap=document.getElementById('place-rows-wrap');
+  const countWrap=document.getElementById('place-count-wrap');
+  if(!sel){quantityEl.style.display='none';return}
   const pfl=S.pflanzen.find(x=>x.id===sel);
-  if(!pfl){hint.style.display='none';return}
+  if(!pfl){quantityEl.style.display='none';return}
 
-  const z=pfl.zellenBedarf||1;
-  const pqm=pfl.pflanzenProQm||1;
-  // Derive recommended grid dimensions (nearest square-ish layout)
-  const recCols=Math.ceil(Math.sqrt(z));
-  const recRows=Math.ceil(z/recCols);
-  const totalPlants=z*pqm;
-
-  htext.innerHTML=`<strong>${pfl.emoji} ${pfl.name}</strong> benötigt <strong>${z} Zelle${z>1?'n':''}</strong> (${z*10*10/100} dm²) · <strong>${pqm} Pflanze${pqm>1?'n':''} pro Zelle</strong><br>
-    Empfohlene Fläche: <strong>${recCols*10}×${recRows*10} cm</strong> → <strong>${totalPlants} Pflanze${totalPlants>1?'n':''}</strong> gesamt<br>
-    <span style="font-size:.72rem;opacity:.8">Du kannst die Größe nach dem Platzieren per Drag am Rahmen anpassen.</span>`;
-  hint.style.display='flex';
-
-  // If this is a new placement, pre-fill the size (stored for savePlacement to use)
-  if(!editPlacementId){
-    window._recommendedCols=recCols;
-    window._recommendedRows=recRows;
+  quantityEl.style.display='block';
+  const b=S.beete.find(x=>x.id===activeBeetId);
+  const ex=editPlacementId&&b?b.placements.find(p=>p.id===editPlacementId):null;
+  const {inReihen,a,b:abstandReihe}=getSpacingNumeric(pfl);
+  if(inReihen){
+    rowsWrap.style.display='block';
+    countWrap.style.display='none';
+    if(ex){
+      const numRows=Math.max(1,Math.round(ex.rows/(abstandReihe||a)));
+      const plantsPerRow=Math.max(1,Math.round(ex.cols/a));
+      document.getElementById('pl-num-rows').value=numRows;
+      document.getElementById('pl-plants-per-row').value=plantsPerRow;
+      const rad=document.querySelector('input[name="pl-row-mode"][value="manual"]');
+      if(rad)rad.checked=true;
+    }else{
+      document.getElementById('pl-num-rows').value=2;
+      document.getElementById('pl-plants-per-row').value=3;
+      const rad=document.querySelector('input[name="pl-row-mode"][value="manual"]');
+      if(rad)rad.checked=true;
+    }
+    updatePlaceRowMode();
+  }else{
+    rowsWrap.style.display='none';
+    countWrap.style.display='block';
+    if(ex){
+      const n=plantsFromArea(ex.rows,ex.cols,getPflanzenProQm(pfl));
+      document.getElementById('pl-num-plants').value=Math.max(1,n);
+    }else document.getElementById('pl-num-plants').value=4;
   }
+  updatePlaceSizeFromInputs();
+
+  if(!editPlacementId){
+    const vonSel=document.getElementById('pl-von');
+    const bisSel=document.getElementById('pl-bis');
+    const a=pfl.anbauMonate;
+    const b=pfl.ernteMonate;
+    if(Array.isArray(a)&&a.length&&vonSel){const v=Math.min(...a);if(v>=0&&v<=11) vonSel.value=String(v);}
+    if(Array.isArray(b)&&b.length&&bisSel){const w=Math.max(...b);if(w>=0&&w<=11) bisSel.value=String(w);}
+  }
+}
+function updatePlaceRowMode(){
+  const mode=(document.querySelector('input[name="pl-row-mode"]:checked')||{}).value||'manual';
+  const manualEl=document.getElementById('place-rows-manual');
+  if(manualEl) manualEl.style.display=(mode==='manual')?'block':'none';
+}
+function updatePlaceSizeFromInputs(){
+  const sel=document.getElementById('pl-pfl').value;
+  const pfl=S.pflanzen.find(x=>x.id===sel);
+  const resultEl=document.getElementById('place-size-result');
+  const b=S.beete.find(x=>x.id===activeBeetId);
+  if(!pfl||!resultEl){return}
+  const {inReihen,a}=getSpacingNumeric(pfl);
+  const bedW=Math.floor(Number(b?.w))||200, bedH=Math.floor(Number(b?.h))||100;
+  const seed=editCellSeed||{row:0,col:0};
+  let recCols=1,recRows=1,totalPlants=0;
+  if(inReihen){
+    const mode=(document.querySelector('input[name="pl-row-mode"]:checked')||{}).value||'manual';
+    const numRows=Math.max(1,parseInt(document.getElementById('pl-num-rows').value,10)||2);
+    const rowDist=Math.ceil(getSpacingNumeric(pfl).b);
+    const vonEl=document.getElementById('pl-von'), bisEl=document.getElementById('pl-bis');
+    const vonVal=vonEl&&vonEl.value!==''?parseInt(vonEl.value,10):null;
+    const bisVal=bisEl&&bisEl.value!==''?parseInt(bisEl.value,10):null;
+    const hasMonths=vonVal!=null&&!Number.isNaN(vonVal)&&bisVal!=null&&!Number.isNaN(bisVal);
+    if(mode==='one-h'){
+      const availCols=hasMonths&&b?getAvailableSpaceFromLeft(b,0,vonVal,bisVal,bedW,bedH):bedW;
+      recCols=Math.max(1,availCols);
+      recRows=Math.max(1,numRows*rowDist);
+      totalPlants=numRows*Math.max(1,Math.floor(recCols/a));
+      window._oneRowStart={row:0,col:0};
+      window._oneRowMode='one-h';
+    }else if(mode==='one-v'){
+      const availRows=hasMonths&&b?getAvailableSpaceFromTop(b,0,vonVal,bisVal,bedW,bedH):bedH;
+      recCols=Math.max(1,numRows*rowDist);
+      recRows=Math.max(1,availRows);
+      totalPlants=numRows*Math.max(1,Math.floor(recRows/a));
+      window._oneRowStart={row:0,col:0};
+      window._oneRowMode='one-v';
+    }else{
+      window._oneRowStart=null;
+      window._oneRowMode=null;
+      const plantsPerRow=Math.max(1,parseInt(document.getElementById('pl-plants-per-row').value,10)||3);
+      const size=computeSizeFromRows(pfl,numRows,plantsPerRow);
+      recCols=size.recCols;recRows=size.recRows;
+      totalPlants=numRows*plantsPerRow;
+    }
+  }else{
+    window._oneRowStart=null;
+    window._oneRowMode=null;
+    const n=Math.max(1,parseInt(document.getElementById('pl-num-plants').value,10)||4);
+    const size=computeSizeFromCount(pfl,n);
+    recCols=size.recCols;recRows=size.recRows;
+    totalPlants=n;
+  }
+  window._recommendedCols=recCols;
+  window._recommendedRows=recRows;
+  resultEl.textContent=`→ Fläche: ${recCols}×${recRows} cm (ca. ${totalPlants} Pflanze${totalPlants!==1?'n':''})`;
 }
 function savePlacement(){
   const b=S.beete.find(x=>x.id===activeBeetId);
+  if(!b){alert('Kein Beet ausgewählt.');return}
   const pflanzeId=document.getElementById('pl-pfl').value;
   if(!pflanzeId){alert('Keine Pflanze ausgewählt');return}
-  const von=parseInt(document.getElementById('pl-von').value);
-  const bis=parseInt(document.getElementById('pl-bis').value);
+  const vonRaw=document.getElementById('pl-von').value;
+  const bisRaw=document.getElementById('pl-bis').value;
+  const von=parseInt(vonRaw,10);
+  const bis=parseInt(bisRaw,10);
+  if(vonRaw===''||bisRaw===''||Number.isNaN(von)||Number.isNaN(bis)||von<0||von>11||bis<0||bis>11){alert('Bitte Erster und Letzter Monat wählen.');return}
   if(bis<von){alert('Letzter Monat muss nach erstem Monat liegen');return}
   const startAufgabe=document.getElementById('pl-start').value;
   if(!b.placements)b.placements=[];
-  const maxCols=Math.ceil(b.w/10), maxRows=Math.ceil(b.h/10);
+  const maxCols=Math.floor(Number(b.w))||200, maxRows=Math.floor(Number(b.h))||100;
 
   if(editPlacementId){
     const pl=b.placements.find(p=>p.id===editPlacementId);
-    if(pl){pl.pflanzeId=pflanzeId;pl.von=von;pl.bis=bis;pl.startAufgabe=startAufgabe}
+    if(pl){
+      pl.pflanzeId=pflanzeId;pl.von=von;pl.bis=bis;pl.startAufgabe=startAufgabe;
+      updatePlaceSizeFromInputs();
+      const requestedCols=Math.max(1, window._recommendedCols||pl.cols);
+      const requestedRows=Math.max(1, window._recommendedRows||pl.rows);
+      const availableCols=maxCols-pl.c, availableRows=maxRows-pl.r;
+      const normalFits=requestedCols<=availableCols&&requestedRows<=availableRows;
+      const flippedFits=requestedRows<=availableCols&&requestedCols<=availableRows;
+      let recCols, recRows;
+      if(normalFits){ recCols=requestedCols; recRows=requestedRows; }
+      else if(flippedFits){ recCols=requestedRows; recRows=requestedCols; }
+      else{
+        alert('Das Beet ist an dieser Position nicht groß genug.\n\nGewünscht: '+requestedCols+'×'+requestedRows+' cm.\nVerfügbar: '+availableCols+'×'+availableRows+' cm.\n\nVerringere Anzahl Reihen bzw. Pflanzen.');
+        save();closeModal('modal-place');
+        renderMonthTabs(b);renderCanvas(b,activeMonth);
+        return;
+      }
+      if(!checkOverlap(b,pl.id,pl.r,pl.c,recRows,recCols,von,bis)){
+        pl.rows=recRows;
+        pl.cols=recCols;
+      }else{
+        const overlapping=getOverlappingPlacements(b,pl.id,pl.r,pl.c,recRows,recCols,von,bis);
+        const names=overlapping.map(o=>o.name).filter((x,i,a)=>a.indexOf(x)===i);
+        const nameList=names.length?names.join(', '):'eine andere Pflanze';
+        alert('Die gewählte Größe überlappt mit '+nameList+' (gleicher Zeitraum).\n\nVerringere die Fläche oder wähle einen anderen Zeitraum.');
+      }
+    }
   }else{
-    const r=editCellSeed.row, c=editCellSeed.col;
-    // Use recommended dimensions from hint, clamped to beet boundaries
+    const start=window._oneRowStart||{row:editCellSeed.row,col:editCellSeed.col};
     const pfl=S.pflanzen.find(x=>x.id===pflanzeId);
-    let recCols=window._recommendedCols||1;
-    let recRows=window._recommendedRows||1;
-    // Clamp so tile doesn't go out of bounds
-    recCols=Math.min(recCols, maxCols-c);
-    recRows=Math.min(recRows, maxRows-r);
-    if(checkOverlap(b,null,r,c,recRows,recCols,von,bis)){
-      // Fallback to 1×1 if recommended size is blocked
-      if(checkOverlap(b,null,r,c,1,1,von,bis)){alert('Diese Zelle ist bereits belegt.');return}
-      recRows=1;recCols=1;
+    let requestedCols=Math.max(1, window._recommendedCols||1);
+    let requestedRows=Math.max(1, window._recommendedRows||1);
+    if(window._oneRowMode==='one-h'){
+      requestedCols=Math.max(1,getAvailableSpaceFromLeft(b,0,von,bis,maxCols,maxRows));
+      requestedRows=Math.max(1, window._recommendedRows||1);
+    }else if(window._oneRowMode==='one-v'){
+      requestedRows=Math.max(1,getAvailableSpaceFromTop(b,0,von,bis,maxCols,maxRows));
+      requestedCols=Math.max(1, window._recommendedCols||1);
+    }
+    let r, c, recCols, recRows;
+    const atClick=(sr,sc,nc,nr)=>
+      sr+nr<=maxRows&&sc+nc<=maxCols&&!checkOverlap(b,null,sr,sc,nr,nc,von,bis);
+    // 1) Try click position with normal size, then rotated (90°)
+    if(atClick(start.row,start.col,requestedCols,requestedRows)){
+      r=start.row; c=start.col; recCols=requestedCols; recRows=requestedRows;
+    }else if(atClick(start.row,start.col,requestedRows,requestedCols)){
+      r=start.row; c=start.col; recCols=requestedRows; recRows=requestedCols;
+    }else{
+      // 2) Search bed for any position where the area fits in normal or rotated orientation
+      const found=findFirstFittingPositionWithRotation(b,requestedRows,requestedCols,von,bis,maxCols,maxRows);
+      if(found){ r=found.r; c=found.c; recCols=found.recCols; recRows=found.recRows; }
+      else{
+        alert('Im Beet ist kein Platz für diese Fläche ('+requestedCols+'×'+requestedRows+' cm) im gewählten Zeitraum. Verringere die Anzahl Reihen bzw. Pflanzen oder wähle einen anderen Zeitraum.');
+        return;
+      }
     }
     b.placements.push({id:uid(),r,c,rows:recRows,cols:recCols,pflanzeId,von,bis,startAufgabe});
+    activeMonth=von; // switch to first month so the new placement is visible
   }
-  window._recommendedCols=1;window._recommendedRows=1;
+  window._recommendedCols=1;window._recommendedRows=1;window._oneRowStart=null;window._oneRowMode=null;
   save();closeModal('modal-place');
+  renderMonthTabs(b);renderCanvas(b,activeMonth);
+}
+function flipPlacement(){
+  const b=S.beete.find(x=>x.id===activeBeetId);
+  if(!b||!editPlacementId) return;
+  const pl=b.placements.find(p=>p.id===editPlacementId);
+  if(!pl) return;
+  const maxCols=Math.floor(Number(b.w))||200, maxRows=Math.floor(Number(b.h))||100;
+  const newRows=pl.cols, newCols=pl.rows;
+  if(pl.r+newRows>maxRows||pl.c+newCols>maxCols){
+    alert('Die gedrehte Fläche passt an dieser Position nicht ins Beet.\n\nGewünscht: '+newCols+'×'+newRows+' cm.\nVerfügbar: '+(maxCols-pl.c)+'×'+(maxRows-pl.r)+' cm.');
+    return;
+  }
+  if(checkOverlap(b,pl.id,pl.r,pl.c,newRows,newCols,pl.von,pl.bis)){
+    const overlapping=getOverlappingPlacements(b,pl.id,pl.r,pl.c,newRows,newCols,pl.von,pl.bis);
+    const names=overlapping.map(o=>o.name).filter((x,i,a)=>a.indexOf(x)===i);
+    const nameList=names.length?names.join(', '):'eine andere Pflanze';
+    alert('Die gedrehte Fläche überlappt mit '+nameList+'.');
+    return;
+  }
+  pl.rows=newRows; pl.cols=newCols;
+  document.getElementById('place-info').textContent='Fläche: '+pl.cols+'×'+pl.rows+' cm · '+calcPflanzenCount(pl)+' Pflanzen';
+  const resultEl=document.getElementById('place-size-result');
+  if(resultEl) resultEl.textContent='→ Fläche: '+pl.cols+'×'+pl.rows+' cm (gedreht)';
+  save();
   renderMonthTabs(b);renderCanvas(b,activeMonth);
 }
 function removePlacement(){
@@ -1067,8 +1457,21 @@ function openPflanzeModal(id=null){
   document.getElementById('pe').value=p?.emoji||'';
   document.getElementById('pt').value=p?.typ||'Gemüse';
   document.getElementById('pp').value=p?.pflege||'';
-  document.getElementById('ppqm').value=p?.pflanzenProQm||1;
-  document.getElementById('pzel').value=p?.zellenBedarf||1;
+  const a=Number(p?.abstandPflanze);
+  if(a>0){
+    document.getElementById('pabstand').value=a;
+    const inReihen=!!(p?.inReihen&&p?.abstandReihe!=null&&p?.abstandReihe!=='');
+    document.getElementById('pinreihen').checked=inReihen;
+    document.getElementById('pabstand-reihe').value=p?.abstandReihe!=null?p.abstandReihe:(a);
+    document.getElementById('pabstand-reihe-wrap').style.display=inReihen?'block':'none';
+  }else{
+    const pqm=Number(p?.pflanzenProQm)||1;
+    const approx=Math.round(100/Math.sqrt(pqm));
+    document.getElementById('pabstand').value=Math.max(5,approx);
+    document.getElementById('pinreihen').checked=false;
+    document.getElementById('pabstand-reihe').value=Math.max(5,approx);
+    document.getElementById('pabstand-reihe-wrap').style.display='none';
+  }
   buildSwatches(p?.color);
   buildPicker('mpan',p?.anbauMonate||[]);
   buildPicker('mper',p?.ernteMonate||[]);
@@ -1077,6 +1480,9 @@ function openPflanzeModal(id=null){
 function savePflanze(){
   const name=document.getElementById('pn').value.trim();
   if(!name){alert('Name erforderlich');return}
+  const abstandPflanze=Math.max(5,parseInt(document.getElementById('pabstand').value,10)||25);
+  const inReihen=document.getElementById('pinreihen').checked;
+  const abstandReihe=inReihen?(Math.max(5,parseInt(document.getElementById('pabstand-reihe').value,10)||abstandPflanze)):undefined;
   const data={
     name,
     emoji:document.getElementById('pe').value.trim()||'🌱',
@@ -1085,8 +1491,9 @@ function savePflanze(){
     anbauMonate:getPicked('mpan'),
     ernteMonate:getPicked('mper'),
     pflege:document.getElementById('pp').value.trim(),
-    pflanzenProQm:Math.max(1,parseInt(document.getElementById('ppqm').value)||1),
-    zellenBedarf:Math.max(1,parseInt(document.getElementById('pzel').value)||1),
+    abstandPflanze,
+    inReihen:!!inReihen,
+    ...(inReihen&&abstandReihe!=null?{abstandReihe}:{}),
   };
   if(editPflId)Object.assign(S.pflanzen.find(x=>x.id===editPflId),data);
   else S.pflanzen.push({id:uid(),...data});
@@ -1119,6 +1526,7 @@ function injectJSON(){
     items.forEach(p=>{
       if(!p.name) return;
       // always assign a fresh id and default missing fields
+      const hasSpacing=p.abstandPflanze!=null&&Number(p.abstandPflanze)>0;
       const entry={
         id:uid(),
         name:p.name||'Unbekannt',
@@ -1128,8 +1536,14 @@ function injectJSON(){
         anbauMonate:Array.isArray(p.anbauMonate)?p.anbauMonate:[],
         ernteMonate:Array.isArray(p.ernteMonate)?p.ernteMonate:[],
         pflege:p.pflege||'',
-        pflanzenProQm:p.pflanzenProQm||1,
-        zellenBedarf:p.zellenBedarf||1,
+        ...(hasSpacing?{
+          abstandPflanze:Number(p.abstandPflanze),
+          inReihen:!!p.inReihen,
+          ...(p.inReihen&&p.abstandReihe!=null?{abstandReihe:Number(p.abstandReihe)}:{}),
+        }:{
+          pflanzenProQm:p.pflanzenProQm||1,
+          zellenBedarf:p.zellenBedarf||1,
+        }),
       };
       S.pflanzen.push(entry);
       added++;
@@ -1168,10 +1582,11 @@ function renderPflanzen(){
   document.getElementById('filter-anbau')?.classList.toggle('filter-active', fAnbau!=='');
   document.getElementById('filter-ernte')?.classList.toggle('filter-active', fErnte!=='');
 
-  // Apply filters
+  // Apply filters and sort alphabetically by name
   let list=S.pflanzen;
   if(fAnbau!=='') list=list.filter(p=>p.anbauMonate?.includes(parseInt(fAnbau)));
   if(fErnte!=='') list=list.filter(p=>p.ernteMonate?.includes(parseInt(fErnte)));
+  list=[...list].sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
 
   // Update count badge
   const cnt=document.getElementById('pfl-count');
@@ -1194,10 +1609,13 @@ function renderPflanzen(){
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <div style="width:14px;height:14px;border-radius:50%;background:${p.color||COLORS[0]};flex-shrink:0"></div>
         <span style="font-size:.72rem;color:var(--ink2)">Beetfarbe</span>
-        <span class="stat-badge">📐 <span>${p.zellenBedarf||1} Zelle${(p.zellenBedarf||1)>1?'n':''}</span></span>
-        <span class="stat-badge">🌱 <span>${p.pflanzenProQm||1}/Zelle</span></span>
       </div>
-      <div>
+      <div style="font-size:.78rem;color:var(--ink);border-top:1px solid var(--border);padding-top:6px;margin-top:4px">
+        <div style="font-size:.66rem;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Abstand</div>
+        <div style="margin-bottom:4px"><span style="font-weight:600;color:var(--ink2)">Pflanzenabstand:</span> ${getAbstandPflanzeCm(p)} cm</div>
+        ${getAbstandReiheCm(p)!=='–'?`<div><span style="font-weight:600;color:var(--ink2)">Reihenabstand:</span> ${getAbstandReiheCm(p)} cm</div>`:''}
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px">
         <div style="font-size:.66rem;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Anbau & Ernte</div>
         <div class="month-bars">${MN.map((_,i)=>{const a=p.anbauMonate?.includes(i),e=p.ernteMonate?.includes(i);return`<div class="mbar${a&&e?' ae':a?' a':e?' e':''}" style="height:${a||e?'100%':'35%'}" title="${MN[i]}"></div>`}).join('')}</div>
         <div style="display:flex;gap:8px;margin-top:4px;font-size:.63rem;color:var(--ink2)">
@@ -1205,8 +1623,52 @@ function renderPflanzen(){
           <span><span style="display:inline-block;width:8px;height:8px;background:var(--amber);border-radius:2px;margin-right:3px"></span>Ernte</span>
         </div>
       </div>
+      ${(function(){const nn=getNichtNachbarn(p);return nn.length?`<div style="font-size:.78rem;color:var(--ink);border-top:1px solid var(--border);padding-top:6px;margin-top:6px"><span style="font-weight:600;color:var(--ink2)">Nicht neben:</span> ${nn.join(', ')}</div>`:''})()}
       ${p.pflege?`<div style="font-size:.78rem;color:var(--ink2);border-top:1px solid var(--border);padding-top:8px">💧 ${p.pflege}</div>`:''}
     </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// BEET-IMAGE FÜR EXPORT (Screenshot-Ersatz)
+// ═══════════════════════════════════════════════════
+function renderBeetToCanvas(b, month, highlightPlId, pxPerCm){
+  const scale=pxPerCm||EXPORT_CPIX;
+  const cols=Math.floor(Number(b.w))||200, rows=Math.floor(Number(b.h))||100;
+  const w=cols*scale, h=rows*scale;
+  const canvas=document.createElement('canvas');
+  canvas.width=w; canvas.height=h;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#f5f0e6';
+  ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle='rgba(160,140,90,0.25)';
+  ctx.lineWidth=1;
+  for(let c=0;c<=cols;c+=10){ ctx.beginPath(); ctx.moveTo(c*scale,0); ctx.lineTo(c*scale,h); ctx.stroke(); }
+  for(let r=0;r<=rows;r+=10){ ctx.beginPath(); ctx.moveTo(0,r*scale); ctx.lineTo(w,r*scale); ctx.stroke(); }
+  const allYearView=month===ALL_YEAR_MONTH;
+  if(b.placements){
+    b.placements.forEach(pl=>{
+      if(!allYearView&&(month<pl.von||month>pl.bis)) return;
+      const pfl=S.pflanzen.find(x=>x.id===pl.pflanzeId);
+      if(!pfl) return;
+      const progress=allYearView?0.5:(pl.bis>pl.von?(month-pl.von)/(pl.bis-pl.von):1);
+      const alpha=0.55+0.45*progress;
+      const col=pfl.color||COLORS[0];
+      const hex=col.slice(0,7);
+      const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), bl=parseInt(hex.slice(5,7),16);
+      ctx.fillStyle=`rgba(${r},${g},${bl},${alpha})`;
+      ctx.fillRect(pl.c*scale,pl.r*scale,pl.cols*scale,pl.rows*scale);
+      if(highlightPlId&&pl.id===highlightPlId){
+        ctx.strokeStyle='#1a1a1a';
+        ctx.lineWidth=Math.max(2, Math.round(scale*0.8));
+        ctx.strokeRect(pl.c*scale,pl.r*scale,pl.cols*scale,pl.rows*scale);
+      }
+    });
+  }
+  return canvas;
+}
+function captureBeetAsDataURL(b, month, highlightPlId){
+  const canvas=renderBeetToCanvas(b, month, highlightPlId, EXPORT_CPIX);
+  return canvas.toDataURL('image/png');
 }
 
 // ═══════════════════════════════════════════════════
@@ -1218,15 +1680,19 @@ function buildAufgaben(){
     if(!b.placements)return;
     b.placements.forEach(pl=>{
       const pfl=S.pflanzen.find(x=>x.id===pl.pflanzeId);
-      const anzahl=pl.rows*pl.cols*(pfl?.pflanzenProQm||1);
+      const anzahl=plantsFromArea(pl.rows,pl.cols,getPflanzenProQm(pfl));
+      const spacingText=getSpacingDisplayText(pfl);
+      const pflege=pfl?.pflege||'';
       for(let m=pl.von;m<=pl.bis;m++){
         all.push({
-          month:m,yr,beet:b.name,
+          month:m,yr,beet:b.name,beetId:b.id,pl,plId:pl.id,b,pfl,
           pflanze:pfl?.name||'?',emoji:pfl?.emoji||'🌱',
           aufgabe:getAufgabeForMonth(pl,m),
           color:pfl?.color||COLORS[0],
           anzahl,
-          flaeche:`${pl.cols*10}×${pl.rows*10} cm`
+          flaeche:`${pl.cols}×${pl.rows} cm`,
+          spacingText,
+          pflege
         });
       }
     });
@@ -1249,6 +1715,10 @@ function renderKalender(){
       </div>`).join('')}
     </div>`).join('');
 }
+function escapeICSText(s){
+  if(s==null||s===undefined) return '';
+  return String(s).replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n');
+}
 function exportICS(){
   const all=buildAufgaben();
   if(!all.length){alert('Keine Aufgaben.');return}
@@ -1257,9 +1727,12 @@ function exportICS(){
   all.forEach((a,i)=>{
     const d=new Date(yr,a.month,1).toISOString().replace(/[-:]/g,'').slice(0,8);
     const d2=new Date(yr,a.month+1,1).toISOString().replace(/[-:]/g,'').slice(0,8);
+    let desc=`Beet: ${a.beet}\\nPflanze: ${a.pflanze}\\nAufgabe: ${a.aufgabe}\\nAnzahl: ${a.anzahl} Pflanzen\\nFläche: ${a.flaeche}`;
+    if(a.spacingText&&a.spacingText!=='–') desc+=`\\nAbstand: ${escapeICSText(a.spacingText)}`;
+    if(a.pflege) desc+=`\\nPflege: ${escapeICSText(a.pflege)}`;
     lines.push('BEGIN:VEVENT',`UID:gp-${Date.now()}-${i}@gp`,`DTSTART;VALUE=DATE:${d}`,`DTEND;VALUE=DATE:${d2}`,
       `SUMMARY:${a.aufgabe}: ${a.pflanze} (${a.beet})`,
-      `DESCRIPTION:Beet: ${a.beet}\\nPflanze: ${a.pflanze}\\nAufgabe: ${a.aufgabe}\\nAnzahl: ${a.anzahl} Pflanzen\\nFläche: ${a.flaeche}`,
+      `DESCRIPTION:${desc}`,
       'CATEGORIES:Garten','END:VEVENT');
   });
   lines.push('END:VCALENDAR');
@@ -1268,11 +1741,65 @@ function exportICS(){
   Object.assign(document.createElement('a'),{href:url,download:'gartenplan.ics'}).click();
   URL.revokeObjectURL(url);
 }
+function exportHTML(){
+  const all=buildAufgaben();
+  if(!all.length){ alert('Keine Aufgaben.'); return; }
+  const yr=new Date().getFullYear();
+  const isPlanting=a=>a.aufgabe==='Säen'||a.aufgabe==='Pflanzen';
+  const byMonth={};
+  all.forEach(a=>{ (byMonth[a.month]=byMonth[a.month]||[]).push(a); });
+  const imageCache={};
+  for(const a of all){
+    if(isPlanting(a)&&a.b&&a.plId){
+      const key=`${a.beetId}-${a.month}-${a.plId}`;
+      if(!imageCache[key]) imageCache[key]=captureBeetAsDataURL(a.b,a.month,a.plId);
+    }
+  }
+  const getImg=(a)=>{
+    if(!isPlanting(a)||!a.b||!a.plId) return '';
+    const key=`${a.beetId}-${a.month}-${a.plId}`;
+    const dataUrl=imageCache[key];
+    if(!dataUrl) return '';
+    return `<div class="export-beet-img"><img src="${dataUrl}" alt="Beet ${a.beet}" style="max-width:100%;max-height:280px;border:1px solid #ccc;border-radius:6px;"/><p style="font-size:.75rem;color:#666;">Beet „${a.beet}“ – Position der Pflanzung (${ML[a.month]} ${yr})</p></div>`;
+  };
+  let html=`<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/><title>Gartenplaner Aufgaben ${yr}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:20px;background:#fafaf8;}
+.export-beet-img{margin:12px 0 20px 0;}
+h2{margin-top:28px;color:#333;}
+.entry{border-left:4px solid #7cb87e;padding:10px 14px;margin:8px 0;background:#fff;border-radius:0 8px 8px 0;}
+.entry h4{margin:0 0 6px 0;font-size:1rem;}
+.entry .meta{font-size:.85rem;color:#555;}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;margin-top:4px;}
+.tag-sae{background:#e8f5e9;} .tag-pfl{background:#e3f2fd;} .tag-ern{background:#fff3e0;} .tag-pflege{background:#f5f5f5;}
+</style></head><body><h1>Gartenplaner Aufgaben ${yr}</h1>`;
+  Object.keys(byMonth).sort((x,y)=>Number(x)-Number(y)).forEach(m=>{
+    const list=byMonth[m];
+    html+=`<h2>${ML[m]} ${yr}</h2>`;
+    list.forEach(a=>{
+      html+=`<div class="entry"><h4>${a.aufgabe}: ${a.pflanze} (${a.beet})</h4><p class="meta">📍 ${a.beet} · 📐 ${a.flaeche} · 🌱 ${a.anzahl} Stk.</p>`;
+      if(a.spacingText&&a.spacingText!=='–') html+=`<p class="meta">${a.spacingText}</p>`;
+      if(a.pflege) html+=`<p class="meta" style="margin-top:6px;">${a.pflege.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>`;
+      if(isPlanting(a)) html+=getImg(a);
+      html+=`<span class="tag tag-${a.aufgabe==='Säen'?'sae':a.aufgabe==='Pflanzen'?'pfl':a.aufgabe==='Ernte'?'ern':'pflege'}">${a.aufgabe}</span></div>`;
+    });
+  });
+  html+='</body></html>';
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  Object.assign(document.createElement('a'),{href:url,download:'gartenplan-aufgaben.html'}).click();
+  URL.revokeObjectURL(url);
+}
 
 // ═══════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════
 (async () => {
+  try {
+    const res = await fetch('/pflanzen.json');
+    if (res.ok) SEED_PFLANZEN = await res.json();
+  } catch (e) {
+    console.warn('pflanzen.json konnte nicht geladen werden.', e);
+  }
   await load();
   seed();
   renderBeetSidebar();
