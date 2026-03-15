@@ -1013,6 +1013,50 @@ function getAvailableSpaceFromTop(b, col, von, bis, maxCols, maxRows){
   }
   return blockAt;
 }
+// First free column in row (start after any plant on the left border). For horizontal row.
+function getFirstFreeColInRow(b, row, von, bis){
+  if(!b.placements) return 0;
+  let startCol=0;
+  for(const pl of b.placements){
+    if(bis<pl.von||von>pl.bis) continue;
+    if(!(row<pl.r+pl.rows&&pl.r<row+1)) continue;
+    if(pl.c<=startCol&&startCol<pl.c+pl.cols) startCol=pl.c+pl.cols;
+  }
+  return startCol;
+}
+// Width (columns) free from startCol in row until next placement or end of bed.
+function getAvailableWidthFrom(b, row, startCol, von, bis, maxCols){
+  if(!b.placements) return Math.max(0,maxCols-startCol);
+  let blockAt=maxCols;
+  for(const pl of b.placements){
+    if(bis<pl.von||von>pl.bis) continue;
+    if(!(row<pl.r+pl.rows&&pl.r<row+1)) continue;
+    if(pl.c>=startCol&&pl.c<blockAt) blockAt=pl.c;
+  }
+  return Math.max(0,blockAt-startCol);
+}
+// First free row in col (start after any plant on the top border). For vertical row.
+function getFirstFreeRowInCol(b, col, von, bis){
+  if(!b.placements) return 0;
+  let startRow=0;
+  for(const pl of b.placements){
+    if(bis<pl.von||von>pl.bis) continue;
+    if(!(col<pl.c+pl.cols&&pl.c<col+1)) continue;
+    if(pl.r<=startRow&&startRow<pl.r+pl.rows) startRow=pl.r+pl.rows;
+  }
+  return startRow;
+}
+// Height (rows) free from startRow in col until next placement or end of bed.
+function getAvailableHeightFrom(b, col, startRow, von, bis, maxRows){
+  if(!b.placements) return Math.max(0,maxRows-startRow);
+  let blockAt=maxRows;
+  for(const pl of b.placements){
+    if(bis<pl.von||von>pl.bis) continue;
+    if(!(col<pl.c+pl.cols&&pl.c<col+1)) continue;
+    if(pl.r>=startRow&&pl.r<blockAt) blockAt=pl.r;
+  }
+  return Math.max(0,blockAt-startRow);
+}
 // First (r,c) in bed where rectangle recRows×recCols fits and does not overlap (von–bis). Row-major order.
 function findFirstFittingPosition(b, recRows, recCols, von, bis, maxCols, maxRows){
   for(let r=0;r<=maxRows-recRows;r++)
@@ -1279,18 +1323,20 @@ function updatePlaceSizeFromInputs(){
     const bisVal=bisEl&&bisEl.value!==''?parseInt(bisEl.value,10):null;
     const hasMonths=vonVal!=null&&!Number.isNaN(vonVal)&&bisVal!=null&&!Number.isNaN(bisVal);
     if(mode==='one-h'){
-      const availCols=hasMonths&&b?getAvailableSpaceFromLeft(b,0,vonVal,bisVal,bedW,bedH):bedW;
+      const startCol=hasMonths&&b?getFirstFreeColInRow(b,0,vonVal,bisVal):0;
+      const availCols=hasMonths&&b?getAvailableWidthFrom(b,0,startCol,vonVal,bisVal,bedW):(bedW-startCol);
       recCols=Math.max(1,availCols);
       recRows=Math.max(1,numRows*rowDist);
       totalPlants=numRows*Math.max(1,Math.floor(recCols/a));
-      window._oneRowStart={row:0,col:0};
+      window._oneRowStart={row:0,col:startCol};
       window._oneRowMode='one-h';
     }else if(mode==='one-v'){
-      const availRows=hasMonths&&b?getAvailableSpaceFromTop(b,0,vonVal,bisVal,bedW,bedH):bedH;
+      const startRow=hasMonths&&b?getFirstFreeRowInCol(b,0,vonVal,bisVal):0;
+      const availRows=hasMonths&&b?getAvailableHeightFrom(b,0,startRow,vonVal,bisVal,bedH):(bedH-startRow);
       recCols=Math.max(1,numRows*rowDist);
       recRows=Math.max(1,availRows);
       totalPlants=numRows*Math.max(1,Math.floor(recRows/a));
-      window._oneRowStart={row:0,col:0};
+      window._oneRowStart={row:startRow,col:0};
       window._oneRowMode='one-v';
     }else{
       window._oneRowStart=null;
@@ -1362,10 +1408,12 @@ function savePlacement(){
     let requestedCols=Math.max(1, window._recommendedCols||1);
     let requestedRows=Math.max(1, window._recommendedRows||1);
     if(window._oneRowMode==='one-h'){
-      requestedCols=Math.max(1,getAvailableSpaceFromLeft(b,0,von,bis,maxCols,maxRows));
+      const startCol=window._oneRowStart&&window._oneRowStart.col!=null?window._oneRowStart.col:getFirstFreeColInRow(b,0,von,bis);
+      requestedCols=Math.max(1,getAvailableWidthFrom(b,0,startCol,von,bis,maxCols));
       requestedRows=Math.max(1, window._recommendedRows||1);
     }else if(window._oneRowMode==='one-v'){
-      requestedRows=Math.max(1,getAvailableSpaceFromTop(b,0,von,bis,maxCols,maxRows));
+      const startRow=window._oneRowStart&&window._oneRowStart.row!=null?window._oneRowStart.row:getFirstFreeRowInCol(b,0,von,bis);
+      requestedRows=Math.max(1,getAvailableHeightFrom(b,0,startRow,von,bis,maxRows));
       requestedCols=Math.max(1, window._recommendedCols||1);
     }
     let r, c, recCols, recRows;
