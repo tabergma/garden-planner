@@ -616,18 +616,23 @@ function seed(){
   if (S.pflanzen.length === 0) {
     S.pflanzen = SEED_PFLANZEN.map(p => ({ ...p, id: uid() }));
     save();
+    _flushSave(); // persist immediately so data survives refresh before debounce
     return;
   }
-  const existingNames = new Set(S.pflanzen.map(p => p.name));
+  const existingNames = new Set(S.pflanzen.map(p => (p && p.name) ? p.name : ''));
   let added = 0;
   for (const p of SEED_PFLANZEN) {
+    if (!p || !p.name) continue;
     if (!existingNames.has(p.name)) {
       S.pflanzen.push({ ...p, id: uid() });
       existingNames.add(p.name);
       added++;
     }
   }
-  if (added) { save(); }
+  if (added) {
+    save();
+    _flushSave(); // persist immediately so server has full list on next load
+  }
 }
 
 // ═══════════════════════════════════════════════════
