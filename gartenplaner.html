@@ -437,14 +437,19 @@ nav{display:flex;gap:4px}
     <div class="fg"><label>Erntemonate</label><div class="mpicker" id="mper"></div></div>
     <div class="fg-row">
       <div class="fg">
-        <label>Pflanzen pro m²</label>
-        <input id="ppqm" type="number" min="0.5" max="200" step="0.5" value="1" placeholder="1"/>
-        <div style="font-size:.7rem;color:var(--ink2);margin-top:3px">z.B. Tomaten: 1–2, Karotten: 80–120</div>
+        <label>Abstand zur nächsten Pflanze (cm)</label>
+        <input id="pabstand" type="number" min="5" max="200" value="25" placeholder="25"/>
+        <div style="font-size:.7rem;color:var(--ink2);margin-top:3px">z.B. Karotten 5–10, Tomaten 50–60</div>
       </div>
       <div class="fg">
-        <label>Platzbedarf (Zellen)</label>
-        <input id="pzel" type="number" min="1" max="100" value="1" placeholder="1"/>
-        <div style="font-size:.7rem;color:var(--ink2);margin-top:3px">z.B. Zucchini: 4, Tomate: 2</div>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="pinreihen" onchange="document.getElementById('pabstand-reihe-wrap').style.display=this.checked?'block':'none'"/>
+          In Reihen pflanzen
+        </label>
+        <div id="pabstand-reihe-wrap" style="display:none;margin-top:6px">
+          <label style="font-size:.75rem;color:var(--ink2)">Abstand zwischen Reihen (cm)</label>
+          <input id="pabstand-reihe" type="number" min="5" max="200" value="30" placeholder="30"/>
+        </div>
       </div>
     </div>
     <div class="fg"><label>Pflegehinweise</label><textarea id="pp" placeholder="Gießen, Düngen…"></textarea></div>
@@ -614,28 +619,9 @@ function buildSwatches(cur){
 function pickColor(c,el){selColor=c;document.querySelectorAll('.cswatch').forEach(s=>s.classList.remove('sel'));el.classList.add('sel')}
 
 // ═══════════════════════════════════════════════════
-// SEED DATA (id is added when merging; missing names are added to existing data)
+// SEED DATA — loaded from pflanzen.json (id added when merging)
 // ═══════════════════════════════════════════════════
-const SEED_PFLANZEN = [
-  // Tomaten: ungünstige Nachbarn (Mischkultur)
-  {name:'Tomaten',    emoji:'🍅',typ:'Gemüse',color:COLORS[0],anbauMonate:[1,2,3],  ernteMonate:[6,7,8,9],  pflege:'Vorkultur Mitte Feb–Mitte Apr, Pflanzung Ende Mai. 60×40 cm. Sonnig, windgeschützt. Buschtomate: Seitentriebe nicht ausbrechen.', pflanzenProQm:2,  zellenBedarf:24, nichtNachbarn:['Gurke','Erbsen','Radieschen']},
-  {name:'Karotten',   emoji:'🥕',typ:'Gemüse',color:COLORS[1],anbauMonate:[2,3,4], ernteMonate:[6,7,8],   pflege:'Vereinzeln bei 3cm',        pflanzenProQm:100,zellenBedarf:1, nichtNachbarn:['Dill']},
-  {name:'Basilikum',  emoji:'🌿',typ:'Kräuter',color:COLORS[7],anbauMonate:[2,3],   ernteMonate:[5,6,7,8,9],pflege:'Aussaat März–April 0,5 cm tief. 15×20 cm. Keimung 10–14 d bei 18–25 °C. Sonnig.', pflanzenProQm:33, zellenBedarf:1, nichtNachbarn:['Dill']},
-  {name:'Zucchini',   emoji:'🥒',typ:'Gemüse',color:COLORS[2],anbauMonate:[3,4,5],   ernteMonate:[6,7,8,9],  pflege:'Vorkultur ab Mitte Apr, Freiland ab Mitte Mai. 2–3 cm tief, 100×80 cm. Sonnig, warm, nährstoffreicher Humusboden. Frostempfindlich.', pflanzenProQm:1,  zellenBedarf:80, nichtNachbarn:['Kürbis','Gurke','Tomaten','Paprika']},
-  {name:'Erdbeeren',  emoji:'🍓',typ:'Obst',  color:COLORS[3],anbauMonate:[2,3,9],  ernteMonate:[5,6,7],   pflege:'Ausläufer entfernen',       pflanzenProQm:4,  zellenBedarf:1, nichtNachbarn:[]},
-  {name:'Kürbis',     emoji:'🎃',typ:'Gemüse',color:COLORS[1],anbauMonate:[4,5],   ernteMonate:[9,10],     pflege:'Ranken führen, viel Platz', pflanzenProQm:1,  zellenBedarf:12, nichtNachbarn:['Zucchini','Gurke']},
-  {name:'Radieschen', emoji:'🌰',typ:'Gemüse',color:COLORS[8],anbauMonate:[2,3,4,8],ernteMonate:[4,5,6,9,10],pflege:'Locker säen, dünn halten',pflanzenProQm:120,zellenBedarf:1, nichtNachbarn:['Tomaten']},
-  {name:'Chicoree Etardo',emoji:'🥗',typ:'Gemüse',color:COLORS[6],anbauMonate:[4,8,9],ernteMonate:[9,10,11],pflege:'Saattiefe 1cm, Reihenabstand 40cm, Pflanzenabstand 10cm. Keimfähigkeit 83%.',pflanzenProQm:10,zellenBedarf:4, nichtNachbarn:[]},
-  {name:'Paprika',     emoji:'🌶️',typ:'Gemüse',color:COLORS[5],anbauMonate:[2,3,4], ernteMonate:[7,8,9,10], pflege:'Vorkultur ab Feb, warm & sonnig, Königsblüte entfernen', pflanzenProQm:3,  zellenBedarf:4, nichtNachbarn:['Tomaten','Erbsen','Zucchini','Kürbis']},
-  {name:'Gurke',      emoji:'🥒',typ:'Gemüse',color:COLORS[2],anbauMonate:[2,3,4,5], ernteMonate:[5,6,7,8], pflege:'Aussaat Mär–Mai im Warmen, Freiland Ende Mai–Jun. 1–2 cm tief, mind. 30×100 cm. Sonnig bis halbschattig, windgeschützt. Rankhilfe.', pflanzenProQm:3,  zellenBedarf:30, nichtNachbarn:['Tomaten']},
-  {name:'Erbsen',     emoji:'🫛',typ:'Gemüse',color:COLORS[9],anbauMonate:[3,4,5],ernteMonate:[5,6,7],  pflege:'In abgetrocknetem Boden 3–4 cm tief. Reihen 25–30 cm, Kornabstand 5–6 cm. Bei 10 cm Höhe anhäufeln. Sonnig, durchlässiger Boden. Fruchtfolge: Stickstoff für Folgekulturen.', pflanzenProQm:50, zellenBedarf:1, nichtNachbarn:['Paprika']},
-  {name:'Petersilie', emoji:'🍃',typ:'Kräuter',color:COLORS[7],anbauMonate:[2,3,4,5,6], ernteMonate:[3,4,5,6,7,8,9],pflege:'0,5–1 cm tief, Reihen 20 cm, in Reihe mind. 10 cm. Keimung 15–30 d bei 15–20 °C. Halbschattig bis sonnig. Zweijährig.', pflanzenProQm:50, zellenBedarf:1, nichtNachbarn:[]},
-  {name:'Schnittlauch',emoji:'🌱',typ:'Kräuter',color:COLORS[7],anbauMonate:[2,3,4,5,6,7],ernteMonate:[3,4,5,6,7,8,9,10],pflege:'30×20 cm. Sonnig bis halbschattig, lockerer humoser Boden. Keimung 10–26 d bei 10–15 °C (Kaltkeimer). Nicht zu tief schneiden (ca. 5 cm stehen lassen).', pflanzenProQm:17, zellenBedarf:1, nichtNachbarn:[]},
-  {name:'Dill',       emoji:'🌿',typ:'Kräuter',color:COLORS[7],anbauMonate:[3,4,5,6,7],ernteMonate:[4,5,6,7,8,9], pflege:'1 cm tief, sonnig. 25×10 cm. Keimung 14–20 d bei 15–20 °C. Blätter jung ernten, zum Tiefgefrieren geeignet.', pflanzenProQm:40, zellenBedarf:1, nichtNachbarn:['Basilikum','Kresse','Karotten']},
-  {name:'Kresse',     emoji:'🌱',typ:'Kräuter',color:COLORS[6],anbauMonate:[3,4,5,6,7,8],ernteMonate:[4,5,6,7,8,9,10],pflege:'Nicht mit Erde bedecken, von unten gießen. Keimung 3–5 d bei 15–20 °C. Nachsaat alle 2–3 Wo für durchgehende Ernte. Hell.', pflanzenProQm:200,zellenBedarf:1, nichtNachbarn:['Dill']},
-  {name:'Kopfsalat',  emoji:'🥬',typ:'Gemüse',color:COLORS[4],anbauMonate:[2,3,4,5,6,7],ernteMonate:[4,5,6,7,8],pflege:'0,5–1 cm tief, ab Mitte Apr auf 30×25 cm. Keimung 7–14 d bei 10–18 °C. Sonnig, nährstoffreich. Hitzefeste Sommersorte.', pflanzenProQm:13,  zellenBedarf:1, nichtNachbarn:[]},
-  {name:'Feldsalat',  emoji:'🥗',typ:'Gemüse',color:COLORS[6],anbauMonate:[7,8], ernteMonate:[9,10,11], pflege:'1–2 cm tief, Reihen 10–15 cm. Keimung 14–21 d bei 3–18 °C (Kaltkeimer). Sonnig, humos, kalkhaltig, sandiger Lehm. Nicht winterhart.', pflanzenProQm:70, zellenBedarf:1, nichtNachbarn:[]},
-];
+let SEED_PFLANZEN = [];
 function seed(){
   if (S.pflanzen.length === 0) {
     S.pflanzen = SEED_PFLANZEN.map(p => ({ ...p, id: uid() }));
@@ -791,10 +777,10 @@ function renderCanvas(b,month){
       tile.style.cssText=`left:${pl.c*CPIX+1}px;top:${pl.r*CPIX+1}px;width:${w}px;height:${h}px;background:${pfl.color||COLORS[0]}${alpha}`;
 
       const emojiSize=Math.min(1.4, Math.max(0.7, (Math.min(w,h)/CPIX)*0.85))+'rem';
-      const totalPflanzen=plantsFromArea(pl.rows,pl.cols,pfl.pflanzenProQm);
+      const totalPflanzen=plantsFromArea(pl.rows,pl.cols,getPflanzenProQm(pfl));
       const showLabel=Math.min(w,h)>CPIX*1.5;
       const showCount=Math.min(w,h)>CPIX*0.9; // show count chip if tile is big enough
-      const nichtNachbarn=pfl.nichtNachbarn||(SEED_PFLANZEN.find(s=>s.name===pfl.name)?.nichtNachbarn)||[];
+      const nichtNachbarn=getNichtNachbarn(pfl);
       const nachbarnLine=Array.isArray(nichtNachbarn)&&nichtNachbarn.length?`<br>⚠️ Nicht neben: ${nichtNachbarn.join(', ')}`:'';
       let conflictNames=[];
       if(Array.isArray(nichtNachbarn)&&nichtNachbarn.length&&b.placements){
@@ -806,7 +792,8 @@ function renderCanvas(b,month){
         });
       }
       const conflictLine=conflictNames.length?`<br>⚠️ Im Beet: ${conflictNames.join(', ')} (ungünstig)`:'';
-      const tooltipHtml=`${pfl.emoji} ${pfl.name}<br>${MN[pl.von]}–${MN[pl.bis]} · ${aufgabe}<br>🌱 ${totalPflanzen} Pflanze${totalPflanzen!==1?'n':''} · 📐 ${pl.cols*10}×${pl.rows*10} cm${nachbarnLine}${conflictLine}`;
+      const spacingLine=getSpacingLabel(pfl)!=='–'?` · 📐 ${getSpacingDisplayText(pfl)}`:'';
+      const tooltipHtml=`${pfl.emoji} ${pfl.name}<br>${MN[pl.von]}–${MN[pl.bis]} · ${aufgabe}<br>🌱 ${totalPflanzen} Pflanze${totalPflanzen!==1?'n':''} · ${pl.cols*10}×${pl.rows*10} cm${spacingLine}${nachbarnLine}${conflictLine}`;
       tile.innerHTML=`
         <div class="ptile-inner">
           <span class="ptile-emoji" style="font-size:${emojiSize}">${pfl.emoji||'🌱'}</span>
@@ -1018,13 +1005,14 @@ function openPlaceModal(row, col, plId){
 
   document.getElementById('place-t').textContent=ex?'Platzierung bearbeiten':'Pflanze setzen';
   document.getElementById('place-info').textContent=ex
-    ?`Fläche: ${ex.cols*10}×${ex.rows*10} cm (${ex.cols*ex.rows} Zellen · ${calcPflanzenCount(ex)} Pflanzen)`
+    ?`Fläche: ${ex.cols*10}×${ex.rows*10} cm · ${calcPflanzenCount(ex)} Pflanzen`
     :`Position: ${col*10} / ${row*10} cm`;
   document.getElementById('remove-btn').style.display=ex?'inline-flex':'none';
 
   const pSel=document.getElementById('pl-pfl');
-  pSel.innerHTML=S.pflanzen.length
-    ?S.pflanzen.map(p=>`<option value="${p.id}"${ex?.pflanzeId===p.id?' selected':''}>${p.emoji} ${p.name}</option>`).join('')
+  const pflSorted=[...S.pflanzen].sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+  pSel.innerHTML=pflSorted.length
+    ?pflSorted.map(p=>`<option value="${p.id}"${ex?.pflanzeId===p.id?' selected':''}>${p.emoji} ${p.name}</option>`).join('')
     :'<option value="">Keine Pflanzen vorhanden — erst anlegen!</option>';
 
   if(ex&&ex.startAufgabe) document.getElementById('pl-start').value=ex.startAufgabe;
@@ -1047,10 +1035,106 @@ function plantsFromArea(rows,cols,pflanzenProQm){
   const n=Math.round(areaM2(rows,cols)*pqm);
   return Math.max(1,n);
 }
+// Spacing-based: plants/m² = 10000 / (abstandPflanze * abstandReihe), rowDist = inReihen ? abstandReihe : abstandPflanze
+function getPflanzenProQm(p){
+  if(!p)return 1;
+  const a=Number(p.abstandPflanze);
+  if(!(a>0))return Number(p.pflanzenProQm)||1;
+  const rowDist=p.inReihen&&p.abstandReihe!=null&&p.abstandReihe!=='' ? Number(p.abstandReihe) : a;
+  const b=rowDist>0?rowDist:a;
+  return 10000/(a*b);
+}
+// Minimum cells for one plant at this spacing (cell = 10×10 cm)
+function getZellenBedarf(p){
+  if(!p)return 1;
+  const a=Number(p.abstandPflanze);
+  if(!(a>0))return Math.max(1,parseInt(p.zellenBedarf,10)||1);
+  const rowDist=p.inReihen&&p.abstandReihe!=null&&p.abstandReihe!=='' ? Number(p.abstandReihe) : a;
+  const b=rowDist>0?rowDist:a;
+  return Math.ceil(a/10)*Math.ceil(b/10);
+}
+function getPlaceHintRec(p){
+  const z=getZellenBedarf(p);
+  const a=Number(p?.abstandPflanze);
+  const rowDist=p?.inReihen&&p?.abstandReihe!=null&&p?.abstandReihe!=='' ? Number(p.abstandReihe) : a;
+  const b=rowDist>0?rowDist:a;
+  const recCols=a>0?Math.ceil(a/10):Math.ceil(Math.sqrt(z));
+  const recRows=(a>0&&b>0)?Math.ceil(b/10):Math.ceil(z/recCols);
+  return { recCols: Math.max(1,recCols), recRows: Math.max(1,recRows) };
+}
+// Display: Abstand (cm) and Reihen/Quadrat — used everywhere instead of /m² and Zellen
+function getSpacingLabel(p){
+  if(!p)return '–';
+  const a=Number(p.abstandPflanze);
+  if(a>0){
+    if(p.inReihen&&p.abstandReihe!=null&&p.abstandReihe!=='')return `${a}×${Number(p.abstandReihe)} cm`;
+    return `${a} cm`;
+  }
+  const pqm=Number(p.pflanzenProQm)||1;
+  const approx=Math.round(100/Math.sqrt(pqm));
+  return '~'+Math.max(5,approx)+' cm';
+}
+function getAnordnungLabel(p){
+  if(!p)return '';
+  const a=Number(p.abstandPflanze);
+  if(!(a>0))return (Number(p.pflanzenProQm)||1)>=20?'Reihe':'Quadrat';
+  return p.inReihen&&p.abstandReihe!=null&&p.abstandReihe!=='' ? 'Reihe' : 'Quadrat';
+}
+// Full spacing text including Reihenabstand when in rows (for placement hint / tooltip)
+function getSpacingDisplayText(p){
+  if(!p)return '–';
+  const a=Number(p.abstandPflanze);
+  if(a>0){
+    if(p.inReihen&&p.abstandReihe!=null&&p.abstandReihe!==''){
+      const re=Number(p.abstandReihe);
+      return `Pflanzenabstand: ${a} cm · Reihenabstand: ${re} cm`;
+    }
+    return `Abstand: ${a} cm`;
+  }
+  const pqm=Number(p.pflanzenProQm)||1;
+  const approx=Math.round(100/Math.sqrt(pqm));
+  return 'Abstand: ~'+Math.max(5,approx)+' cm';
+}
+// Three separate values for the plant card (use seed by name if plant has no spacing)
+function getAbstandPflanzeCm(p){
+  if(!p)return '–';
+  let a=Number(p.abstandPflanze);
+  if(!(a>0)&&p.name){const seed=SEED_PFLANZEN.find(s=>s&&s.name===p.name);if(seed&&Number(seed.abstandPflanze)>0)a=Number(seed.abstandPflanze);}
+  if(a>0)return String(a);
+  const pqm=Number(p.pflanzenProQm)||1;
+  return '~'+Math.max(5,Math.round(100/Math.sqrt(pqm)));
+}
+function getInReihenDisplay(p){
+  if(!p)return '–';
+  const hasSpacing=Number(p.abstandPflanze)>0;
+  let inReihen=p.inReihen, re=p.abstandReihe;
+  if(!hasSpacing&&p.name){const seed=SEED_PFLANZEN.find(s=>s&&s.name===p.name);if(seed){inReihen=seed.inReihen;re=seed.abstandReihe;}}
+  if(inReihen&&re!=null&&re!=='')return 'Ja';
+  if(hasSpacing)return 'Nein';
+  if(p.name){const seed=SEED_PFLANZEN.find(s=>s&&s.name===p.name);if(seed&&Number(seed.abstandPflanze)>0)return (seed.inReihen&&seed.abstandReihe!=null&&seed.abstandReihe!=='')?'Ja':'Nein';}
+  return (Number(p.pflanzenProQm)||1)>=20?'Ja':'Nein';
+}
+function getAbstandReiheCm(p){
+  if(!p)return '–';
+  let inReihen=p.inReihen, re=p.abstandReihe;
+  const hasSpacing=Number(p.abstandPflanze)>0;
+  if(!hasSpacing&&p.name){const seed=SEED_PFLANZEN.find(s=>s&&s.name===p.name);if(seed){inReihen=seed.inReihen;re=seed.abstandReihe;}}
+  if(!inReihen||re==null||re==='')return '–';
+  const num=Number(re);
+  if(!(num>=0))return '–';
+  return String(num);
+}
+// Unfavorable neighbours: from plant or seed by name
+function getNichtNachbarn(p){
+  if(!p||!p.name)return [];
+  if(Array.isArray(p.nichtNachbarn)&&p.nichtNachbarn.length)return p.nichtNachbarn;
+  const seed=SEED_PFLANZEN.find(s=>s&&s.name===p.name);
+  return (seed&&Array.isArray(seed.nichtNachbarn))?seed.nichtNachbarn:[];
+}
 function calcPflanzenCount(pl){
   const pfl=S.pflanzen.find(x=>x.id===pl.pflanzeId);
   if(!pfl)return '?';
-  return plantsFromArea(pl.rows,pl.cols,pfl.pflanzenProQm);
+  return plantsFromArea(pl.rows,pl.cols,getPflanzenProQm(pfl));
 }
 
 // Updates the space hint in the placement modal based on selected plant
@@ -1062,15 +1146,11 @@ function updatePlaceHint(){
   const pfl=S.pflanzen.find(x=>x.id===sel);
   if(!pfl){hint.style.display='none';return}
 
-  const z=pfl.zellenBedarf||1;
-  const pqm=Number(pfl.pflanzenProQm)||1;
-  const recCols=Math.ceil(Math.sqrt(z));
-  const recRows=Math.ceil(z/recCols);
-  const totalPlants=plantsFromArea(recRows,recCols,pqm);
-
-  htext.innerHTML=`<strong>${pfl.emoji} ${pfl.name}</strong> benötigt <strong>${z} Zelle${z>1?'n':''}</strong> (${(z*0.01).toFixed(2)} m²) · <strong>${pqm} Pflanze${pqm!==1?'n':''} pro m²</strong><br>
+  const { recCols, recRows }=getPlaceHintRec(pfl);
+  const totalPlants=plantsFromArea(recRows,recCols,getPflanzenProQm(pfl));
+  htext.innerHTML=`<strong>${pfl.emoji} ${pfl.name}</strong> <strong>${getSpacingDisplayText(pfl)}</strong><br>
     Empfohlene Fläche: <strong>${recCols*10}×${recRows*10} cm</strong> → <strong>${totalPlants} Pflanze${totalPlants>1?'n':''}</strong> gesamt<br>
-    <span style="font-size:.72rem;opacity:.8">Du kannst die Größe nach dem Platzieren per Drag am Rahmen anpassen.</span>`;
+    <span style="font-size:.72rem;opacity:.8">Größe nach dem Platzieren am Rahmen anpassen.</span>`;
   hint.style.display='flex';
 
   if(!editPlacementId){
@@ -1169,8 +1249,21 @@ function openPflanzeModal(id=null){
   document.getElementById('pe').value=p?.emoji||'';
   document.getElementById('pt').value=p?.typ||'Gemüse';
   document.getElementById('pp').value=p?.pflege||'';
-  document.getElementById('ppqm').value=p?.pflanzenProQm||1;
-  document.getElementById('pzel').value=p?.zellenBedarf||1;
+  const a=Number(p?.abstandPflanze);
+  if(a>0){
+    document.getElementById('pabstand').value=a;
+    const inReihen=!!(p?.inReihen&&p?.abstandReihe!=null&&p?.abstandReihe!=='');
+    document.getElementById('pinreihen').checked=inReihen;
+    document.getElementById('pabstand-reihe').value=p?.abstandReihe!=null?p.abstandReihe:(a);
+    document.getElementById('pabstand-reihe-wrap').style.display=inReihen?'block':'none';
+  }else{
+    const pqm=Number(p?.pflanzenProQm)||1;
+    const approx=Math.round(100/Math.sqrt(pqm));
+    document.getElementById('pabstand').value=Math.max(5,approx);
+    document.getElementById('pinreihen').checked=false;
+    document.getElementById('pabstand-reihe').value=Math.max(5,approx);
+    document.getElementById('pabstand-reihe-wrap').style.display='none';
+  }
   buildSwatches(p?.color);
   buildPicker('mpan',p?.anbauMonate||[]);
   buildPicker('mper',p?.ernteMonate||[]);
@@ -1179,6 +1272,9 @@ function openPflanzeModal(id=null){
 function savePflanze(){
   const name=document.getElementById('pn').value.trim();
   if(!name){alert('Name erforderlich');return}
+  const abstandPflanze=Math.max(5,parseInt(document.getElementById('pabstand').value,10)||25);
+  const inReihen=document.getElementById('pinreihen').checked;
+  const abstandReihe=inReihen?(Math.max(5,parseInt(document.getElementById('pabstand-reihe').value,10)||abstandPflanze)):undefined;
   const data={
     name,
     emoji:document.getElementById('pe').value.trim()||'🌱',
@@ -1187,8 +1283,9 @@ function savePflanze(){
     anbauMonate:getPicked('mpan'),
     ernteMonate:getPicked('mper'),
     pflege:document.getElementById('pp').value.trim(),
-    pflanzenProQm:Math.max(0.5,parseFloat(document.getElementById('ppqm').value)||1),
-    zellenBedarf:Math.max(1,parseInt(document.getElementById('pzel').value)||1),
+    abstandPflanze,
+    inReihen:!!inReihen,
+    ...(inReihen&&abstandReihe!=null?{abstandReihe}:{}),
   };
   if(editPflId)Object.assign(S.pflanzen.find(x=>x.id===editPflId),data);
   else S.pflanzen.push({id:uid(),...data});
@@ -1221,6 +1318,7 @@ function injectJSON(){
     items.forEach(p=>{
       if(!p.name) return;
       // always assign a fresh id and default missing fields
+      const hasSpacing=p.abstandPflanze!=null&&Number(p.abstandPflanze)>0;
       const entry={
         id:uid(),
         name:p.name||'Unbekannt',
@@ -1230,8 +1328,14 @@ function injectJSON(){
         anbauMonate:Array.isArray(p.anbauMonate)?p.anbauMonate:[],
         ernteMonate:Array.isArray(p.ernteMonate)?p.ernteMonate:[],
         pflege:p.pflege||'',
-        pflanzenProQm:p.pflanzenProQm||1,
-        zellenBedarf:p.zellenBedarf||1,
+        ...(hasSpacing?{
+          abstandPflanze:Number(p.abstandPflanze),
+          inReihen:!!p.inReihen,
+          ...(p.inReihen&&p.abstandReihe!=null?{abstandReihe:Number(p.abstandReihe)}:{}),
+        }:{
+          pflanzenProQm:p.pflanzenProQm||1,
+          zellenBedarf:p.zellenBedarf||1,
+        }),
       };
       S.pflanzen.push(entry);
       added++;
@@ -1270,10 +1374,11 @@ function renderPflanzen(){
   document.getElementById('filter-anbau')?.classList.toggle('filter-active', fAnbau!=='');
   document.getElementById('filter-ernte')?.classList.toggle('filter-active', fErnte!=='');
 
-  // Apply filters
+  // Apply filters and sort alphabetically by name
   let list=S.pflanzen;
   if(fAnbau!=='') list=list.filter(p=>p.anbauMonate?.includes(parseInt(fAnbau)));
   if(fErnte!=='') list=list.filter(p=>p.ernteMonate?.includes(parseInt(fErnte)));
+  list=[...list].sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
 
   // Update count badge
   const cnt=document.getElementById('pfl-count');
@@ -1296,10 +1401,13 @@ function renderPflanzen(){
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <div style="width:14px;height:14px;border-radius:50%;background:${p.color||COLORS[0]};flex-shrink:0"></div>
         <span style="font-size:.72rem;color:var(--ink2)">Beetfarbe</span>
-        <span class="stat-badge">📐 <span>${p.zellenBedarf||1} Zelle${(p.zellenBedarf||1)>1?'n':''}</span></span>
-        <span class="stat-badge">🌱 <span>${p.pflanzenProQm||1}/m²</span></span>
       </div>
-      <div>
+      <div style="font-size:.78rem;color:var(--ink);border-top:1px solid var(--border);padding-top:6px;margin-top:4px">
+        <div style="font-size:.66rem;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Abstand</div>
+        <div style="margin-bottom:4px"><span style="font-weight:600;color:var(--ink2)">Pflanzenabstand:</span> ${getAbstandPflanzeCm(p)} cm</div>
+        ${getAbstandReiheCm(p)!=='–'?`<div><span style="font-weight:600;color:var(--ink2)">Reihenabstand:</span> ${getAbstandReiheCm(p)} cm</div>`:''}
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:8px">
         <div style="font-size:.66rem;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Anbau & Ernte</div>
         <div class="month-bars">${MN.map((_,i)=>{const a=p.anbauMonate?.includes(i),e=p.ernteMonate?.includes(i);return`<div class="mbar${a&&e?' ae':a?' a':e?' e':''}" style="height:${a||e?'100%':'35%'}" title="${MN[i]}"></div>`}).join('')}</div>
         <div style="display:flex;gap:8px;margin-top:4px;font-size:.63rem;color:var(--ink2)">
@@ -1307,7 +1415,7 @@ function renderPflanzen(){
           <span><span style="display:inline-block;width:8px;height:8px;background:var(--amber);border-radius:2px;margin-right:3px"></span>Ernte</span>
         </div>
       </div>
-      ${Array.isArray(p.nichtNachbarn)&&p.nichtNachbarn.length?`<div style="font-size:.72rem;color:var(--ink2);border-top:1px solid var(--border);padding-top:6px;margin-top:6px">⚠️ Nicht neben: ${p.nichtNachbarn.join(', ')}</div>`:''}
+      ${(function(){const nn=getNichtNachbarn(p);return nn.length?`<div style="font-size:.78rem;color:var(--ink);border-top:1px solid var(--border);padding-top:6px;margin-top:6px"><span style="font-weight:600;color:var(--ink2)">Nicht neben:</span> ${nn.join(', ')}</div>`:''})()}
       ${p.pflege?`<div style="font-size:.78rem;color:var(--ink2);border-top:1px solid var(--border);padding-top:8px">💧 ${p.pflege}</div>`:''}
     </div>`).join('');
 }
@@ -1321,7 +1429,7 @@ function buildAufgaben(){
     if(!b.placements)return;
     b.placements.forEach(pl=>{
       const pfl=S.pflanzen.find(x=>x.id===pl.pflanzeId);
-      const anzahl=plantsFromArea(pl.rows,pl.cols,pfl?.pflanzenProQm);
+      const anzahl=plantsFromArea(pl.rows,pl.cols,getPflanzenProQm(pfl));
       for(let m=pl.von;m<=pl.bis;m++){
         all.push({
           month:m,yr,beet:b.name,
@@ -1376,6 +1484,12 @@ function exportICS(){
 // INIT
 // ═══════════════════════════════════════════════════
 (async () => {
+  try {
+    const res = await fetch('/pflanzen.json');
+    if (res.ok) SEED_PFLANZEN = await res.json();
+  } catch (e) {
+    console.warn('pflanzen.json konnte nicht geladen werden.', e);
+  }
   await load();
   seed();
   renderBeetSidebar();
