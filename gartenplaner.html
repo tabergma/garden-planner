@@ -591,22 +591,43 @@ function buildSwatches(cur){
 function pickColor(c,el){selColor=c;document.querySelectorAll('.cswatch').forEach(s=>s.classList.remove('sel'));el.classList.add('sel')}
 
 // ═══════════════════════════════════════════════════
-// SEED DATA
+// SEED DATA (id is added when merging; missing names are added to existing data)
 // ═══════════════════════════════════════════════════
+const SEED_PFLANZEN = [
+  {name:'Tomaten',    emoji:'🍅',typ:'Gemüse',color:COLORS[0],anbauMonate:[3,4],  ernteMonate:[6,7,8,9],  pflege:'Ausgeizen, viel Wasser',   pflanzenProQm:1,  zellenBedarf:2},
+  {name:'Karotten',   emoji:'🥕',typ:'Gemüse',color:COLORS[1],anbauMonate:[2,3,4], ernteMonate:[6,7,8],   pflege:'Vereinzeln bei 3cm',        pflanzenProQm:16, zellenBedarf:1},
+  {name:'Basilikum',  emoji:'🌿',typ:'Kräuter',color:COLORS[7],anbauMonate:[3,4,5], ernteMonate:[5,6,7,8,9],pflege:'Sonnig, nicht zu nass',   pflanzenProQm:4,  zellenBedarf:1},
+  {name:'Zucchini',   emoji:'🥒',typ:'Gemüse',color:COLORS[2],anbauMonate:[4,5],   ernteMonate:[6,7,8,9],  pflege:'Viel Platz & Wasser',       pflanzenProQm:1,  zellenBedarf:6},
+  {name:'Erdbeeren',  emoji:'🍓',typ:'Obst',  color:COLORS[3],anbauMonate:[2,3,9],  ernteMonate:[5,6,7],   pflege:'Ausläufer entfernen',       pflanzenProQm:4,  zellenBedarf:1},
+  {name:'Kürbis',     emoji:'🎃',typ:'Gemüse',color:COLORS[1],anbauMonate:[4,5],   ernteMonate:[9,10],     pflege:'Ranken führen, viel Platz', pflanzenProQm:1,  zellenBedarf:12},
+  {name:'Radieschen', emoji:'🌰',typ:'Gemüse',color:COLORS[8],anbauMonate:[2,3,4,8],ernteMonate:[4,5,6,9,10],pflege:'Locker säen, dünn halten',pflanzenProQm:16, zellenBedarf:1},
+  {name:'Chicoree Etardo',emoji:'🥗',typ:'Gemüse',color:COLORS[6],anbauMonate:[4,8,9],ernteMonate:[9,10,11],pflege:'Saattiefe 1cm, Reihenabstand 40cm, Pflanzenabstand 10cm. Keimfähigkeit 83%.',pflanzenProQm:1,zellenBedarf:4},
+  {name:'Paprika',     emoji:'🌶️',typ:'Gemüse',color:COLORS[5],anbauMonate:[2,3,4], ernteMonate:[7,8,9,10], pflege:'Vorkultur ab Feb, warm & sonnig, Königsblüte entfernen', pflanzenProQm:3,  zellenBedarf:4},
+  {name:'Gurke',      emoji:'🥒',typ:'Gemüse',color:COLORS[2],anbauMonate:[3,4,5], ernteMonate:[7,8,9,10], pflege:'Nach Eisheiligen pflanzen, Rankhilfe, viel Wasser',       pflanzenProQm:2,  zellenBedarf:4},
+  {name:'Erbsen',     emoji:'🫛',typ:'Gemüse',color:COLORS[9],anbauMonate:[3,4,5,6],ernteMonate:[6,7,8,9],  pflege:'Direktsaat, Kletterhilfe bei Stangen-erbsen',           pflanzenProQm:25, zellenBedarf:1},
+  {name:'Petersilie', emoji:'🍃',typ:'Kräuter',color:COLORS[7],anbauMonate:[3,4,5], ernteMonate:[5,6,7,8,9],pflege:'Gleichmäßig feucht, Keimung 3–4 Wochen, jährlich neu säen',pflanzenProQm:12, zellenBedarf:1},
+  {name:'Schnittlauch',emoji:'🌱',typ:'Kräuter',color:COLORS[7],anbauMonate:[3,4,5,6,7,8],ernteMonate:[4,5,6,7,8,9,10],pflege:'Regelmäßig schneiden, feucht halten, vor Blüte ernten',pflanzenProQm:8, zellenBedarf:1},
+  {name:'Dill',       emoji:'🌿',typ:'Kräuter',color:COLORS[7],anbauMonate:[4,5,6,7,8],ernteMonate:[6,7,8,9], pflege:'Sonnig, Blätter jung ernten, alle 3 Wo nachsäen möglich', pflanzenProQm:6,  zellenBedarf:1},
+  {name:'Kresse',     emoji:'🌱',typ:'Kräuter',color:COLORS[6],anbauMonate:[3,4,5,6,7,8,9],ernteMonate:[4,5,6,7,8,9,10],pflege:'Feucht halten, schattig, Ernte nach 1–2 Wo möglich', pflanzenProQm:50, zellenBedarf:1},
+  {name:'Kopfsalat',  emoji:'🥬',typ:'Gemüse',color:COLORS[4],anbauMonate:[2,3,4,5,8,9,10],ernteMonate:[4,5,6,7,8,9,10,11],pflege:'Flach säen (ca. 1 cm), 25–30 cm Abstand, 5–7 Wo bis Ernte', pflanzenProQm:9,  zellenBedarf:1},
+  {name:'Feldsalat',  emoji:'🥗',typ:'Gemüse',color:COLORS[6],anbauMonate:[2,3,7,8,9], ernteMonate:[4,5,6,9,10,11,1], pflege:'Winterhart, sonnig bis halbschattig, lockeren Boden, 8 Wo bis Ernte', pflanzenProQm:20, zellenBedarf:1},
+];
 function seed(){
-  if(S.pflanzen.length)return;
-  S.pflanzen=[
-    {id:uid(),name:'Tomaten',    emoji:'🍅',typ:'Gemüse',color:COLORS[0],anbauMonate:[3,4],  ernteMonate:[6,7,8,9],  pflege:'Ausgeizen, viel Wasser',   pflanzenProQm:1,  zellenBedarf:2},
-    {id:uid(),name:'Karotten',   emoji:'🥕',typ:'Gemüse',color:COLORS[1],anbauMonate:[2,3,4], ernteMonate:[6,7,8],   pflege:'Vereinzeln bei 3cm',        pflanzenProQm:16, zellenBedarf:1},
-    {id:uid(),name:'Basilikum',  emoji:'🌿',typ:'Kräuter',color:COLORS[7],anbauMonate:[3,4,5], ernteMonate:[5,6,7,8,9],pflege:'Sonnig, nicht zu nass',   pflanzenProQm:4,  zellenBedarf:1},
-    {id:uid(),name:'Zucchini',   emoji:'🥒',typ:'Gemüse',color:COLORS[2],anbauMonate:[4,5],   ernteMonate:[6,7,8,9],  pflege:'Viel Platz & Wasser',       pflanzenProQm:1,  zellenBedarf:6},
-    {id:uid(),name:'Erdbeeren',  emoji:'🍓',typ:'Obst',  color:COLORS[3],anbauMonate:[2,3,9],  ernteMonate:[5,6,7],   pflege:'Ausläufer entfernen',       pflanzenProQm:4,  zellenBedarf:1},
-    {id:uid(),name:'Salat',      emoji:'🥬',typ:'Gemüse',color:COLORS[4],anbauMonate:[2,3,4,8],ernteMonate:[4,5,9,10],pflege:'Gleichmäßig feucht halten', pflanzenProQm:4,  zellenBedarf:1},
-    {id:uid(),name:'Kürbis',     emoji:'🎃',typ:'Gemüse',color:COLORS[1],anbauMonate:[4,5],   ernteMonate:[9,10],     pflege:'Ranken führen, viel Platz', pflanzenProQm:1,  zellenBedarf:12},
-    {id:uid(),name:'Radieschen', emoji:'🌰',typ:'Gemüse',color:COLORS[8],anbauMonate:[2,3,4,8],ernteMonate:[4,5,6,9,10],pflege:'Locker säen, dünn halten',pflanzenProQm:16, zellenBedarf:1},
-    {id:uid(),name:'Chicoree Etardo',emoji:'🥗',typ:'Gemüse',color:COLORS[6],anbauMonate:[4,8,9],ernteMonate:[9,10,11],pflege:'Saattiefe 1cm, Reihenabstand 40cm, Pflanzenabstand 10cm. Keimfähigkeit 83%.',pflanzenProQm:1,zellenBedarf:4},
-  ];
-  save();
+  if (S.pflanzen.length === 0) {
+    S.pflanzen = SEED_PFLANZEN.map(p => ({ ...p, id: uid() }));
+    save();
+    return;
+  }
+  const existingNames = new Set(S.pflanzen.map(p => p.name));
+  let added = 0;
+  for (const p of SEED_PFLANZEN) {
+    if (!existingNames.has(p.name)) {
+      S.pflanzen.push({ ...p, id: uid() });
+      existingNames.add(p.name);
+      added++;
+    }
+  }
+  if (added) { save(); }
 }
 
 // ═══════════════════════════════════════════════════

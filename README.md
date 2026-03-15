@@ -1,53 +1,69 @@
-Garden Planner
+# Garden Planner
 
-Ein interaktiver Planer, mit dem du dein Gemüse- bzw. Nutzgarten-Beet monatlich planen und verwalten kannst. Du kannst Beete anlegen, Pflanzen definieren, Anbau- und Erntemonate festlegen und daraus automatisch Aufgaben generieren.
-Das ist mein erstes vibe-coded Projekt, für mich zum üben aber auch weil ich diesen Gemüseplaner brauche. 
+An interactive planner to manage your vegetable or kitchen-garden beds by month. Create beds, define plants, set growing and harvest months, and generate tasks automatically. This is a small vibe-coded project—both for practice and because this planner was needed.
 
-🚀 Features
+## Features
 
-Visuelle Beetplanung (Pflanzen platzieren & bearbeiten)
+- **Visual bed planning** — Place and edit plants on your beds
+- **Plant data** — Growing and harvest months, space requirements, care notes
+- **Automatic tasks** — Sowing, care, and harvest based on growth data
+- **Export** — Calendar (.ics) export
+- **Browser-based** — No install required; use in any modern browser
 
-Pflanzendaten verwalten (Anbau- & Erntemonate, Platzbedarf, Pflegehinweise)
+## Installation
 
-Automatische Aufgaben (Säen, Pflege, Ernte) basierend auf Wachstum
+### Prerequisites
 
-Export als Kalender-ICS möglich
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
 
-Einfach über einen Browser nutzbar
+### Run with Docker
 
-📦 Installation
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/Garden_planner.git
+   cd Garden_planner
+   ```
 
-Voraussetzungen: Docker & Docker Compose
+2. Start the app:
+   ```bash
+   docker compose up -d
+   ```
+   (On older setups you may need `docker-compose up -d`.)
 
-Repository klonen
+3. Open in your browser: **http://localhost:8080**
 
-git clone https://github.com/franzidecker/Garden_planner.git
-cd Garden_planner
+To stop: `docker compose down`
 
-Anwendung starten
+### Run without Docker (development)
 
-docker compose up -d
+1. Install [Node.js](https://nodejs.org/) (v18 or newer).
+2. In the project folder, run:
+   ```bash
+   node server.js
+   ```
+3. Open **http://localhost:3000**
 
-Öffne deinen Browser und gehe zu
-http://localhost:8080
+Data is stored in `./data/gartenplaner.json`. Create a `data` folder if it does not exist; the server will create the file on first use.
 
-🧠 Architektur
+## Architecture
 
-Frontend: Einfache HTML/JS-Oberfläche (gartenplaner.html) für die Interaktion
+- **Frontend:** Single HTML/JS page (`gartenplaner.html`) for the UI
+- **Backend:** Node.js server (`server.js`) — API and file-based storage
+- **Persistence:** JSON file in the `data` directory (`/app/data` inside the container when using Docker)
 
-Backend: Node.js-Server (server.js) stellt API und Daten-Speicherung bereit
+## API Endpoints
 
-Persistenz: JSON-Datei im Ordner /data
+| Method | Path      | Description                    |
+|--------|-----------|--------------------------------|
+| GET    | `/api/data` | Returns current garden state   |
+| POST   | `/api/data` | Saves new garden data (JSON body) |
 
-📁 API Endpunkte
+## Development & Contributing
 
-GET /api/data – Liefert den aktuellen Garten-Status
+Contributions are welcome.
 
-POST /api/data – Speichert neue Garten-Daten
+1. Fork the repo  
+2. Create a feature branch  
+3. Open a Pull Request  
 
-🛠️ Entwicklung & Beiträge
-
-Beiträge willkommen!
-
-Fork → 2. Feature-Branch → 3. Pull Request
-Bitte Issues öffnen für Bugs oder Feature-Requests.
+Please open an issue for bugs or feature requests.
