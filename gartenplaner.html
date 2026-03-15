@@ -102,9 +102,30 @@ nav{display:flex;gap:4px}
 }
 .ptile-resize::after{content:'';display:block;width:8px;height:8px;border-right:2px solid rgba(0,0,0,.5);border-bottom:2px solid rgba(0,0,0,.5)}
 
-/* TOOLTIP */
-.ptile-tooltip{position:absolute;bottom:calc(100%+5px);left:50%;transform:translateX(-50%);background:var(--soil);color:var(--paper2);font-size:.64rem;padding:4px 9px;border-radius:5px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:30;line-height:1.5}
-.ptile:hover .ptile-tooltip{opacity:1}
+/* TOOLTIP — content source only (clipped inside canvas); global tooltip is shown via JS */
+.ptile-tooltip{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;pointer-events:none}
+/* Global tooltip: fixed, always on top, not clipped */
+.ptile-tooltip-global{
+  position:fixed;
+  left:0;top:0;
+  background:var(--soil);
+  color:var(--paper2);
+  font-size:.7rem;
+  padding:8px 12px;
+  border-radius:8px;
+  white-space:normal;
+  max-width:280px;
+  pointer-events:none;
+  z-index:9999;
+  line-height:1.45;
+  box-shadow:0 4px 20px rgba(0,0,0,.45);
+  border:1px solid rgba(0,0,0,.3);
+  text-align:left;
+  visibility:hidden;
+  opacity:0;
+  transition:opacity .15s ease, visibility .15s;
+}
+.ptile-tooltip-global.is-visible{visibility:visible;opacity:1}
 
 /* DRAG GHOST */
 #drag-ghost{position:fixed;pointer-events:none;z-index:1000;border-radius:6px;opacity:.7;box-shadow:0 8px 28px rgba(0,0,0,.35);display:none;align-items:center;justify-content:center}
@@ -311,6 +332,7 @@ nav{display:flex;gap:4px}
               <div class="grid-cells" id="grid-cells"></div>
             </div>
           </div>
+          <div id="ptile-tooltip-global" class="ptile-tooltip-global" aria-hidden="true"></div>
         </div>
       </div>
     </div>
@@ -595,23 +617,24 @@ function pickColor(c,el){selColor=c;document.querySelectorAll('.cswatch').forEac
 // SEED DATA (id is added when merging; missing names are added to existing data)
 // ═══════════════════════════════════════════════════
 const SEED_PFLANZEN = [
-  {name:'Tomaten',    emoji:'🍅',typ:'Gemüse',color:COLORS[0],anbauMonate:[3,4],  ernteMonate:[7,8,9,10],  pflege:'Ausgeizen, viel Wasser',   pflanzenProQm:1,  zellenBedarf:2},
-  {name:'Karotten',   emoji:'🥕',typ:'Gemüse',color:COLORS[1],anbauMonate:[2,3,4], ernteMonate:[6,7,8],   pflege:'Vereinzeln bei 3cm',        pflanzenProQm:100,zellenBedarf:1},
-  {name:'Basilikum',  emoji:'🌿',typ:'Kräuter',color:COLORS[7],anbauMonate:[3,4,5], ernteMonate:[5,6,7,8,9],pflege:'Sonnig, nicht zu nass',   pflanzenProQm:20, zellenBedarf:1},
-  {name:'Zucchini',   emoji:'🥒',typ:'Gemüse',color:COLORS[2],anbauMonate:[4,5],   ernteMonate:[6,7,8,9],  pflege:'Viel Platz & Wasser',       pflanzenProQm:1,  zellenBedarf:6},
-  {name:'Erdbeeren',  emoji:'🍓',typ:'Obst',  color:COLORS[3],anbauMonate:[2,3,9],  ernteMonate:[5,6,7],   pflege:'Ausläufer entfernen',       pflanzenProQm:4,  zellenBedarf:1},
-  {name:'Kürbis',     emoji:'🎃',typ:'Gemüse',color:COLORS[1],anbauMonate:[4,5],   ernteMonate:[9,10],     pflege:'Ranken führen, viel Platz', pflanzenProQm:1,  zellenBedarf:12},
-  {name:'Radieschen', emoji:'🌰',typ:'Gemüse',color:COLORS[8],anbauMonate:[2,3,4,8],ernteMonate:[4,5,6,9,10],pflege:'Locker säen, dünn halten',pflanzenProQm:120,zellenBedarf:1},
-  {name:'Chicoree Etardo',emoji:'🥗',typ:'Gemüse',color:COLORS[6],anbauMonate:[4,8,9],ernteMonate:[9,10,11],pflege:'Saattiefe 1cm, Reihenabstand 40cm, Pflanzenabstand 10cm. Keimfähigkeit 83%.',pflanzenProQm:10,zellenBedarf:4},
-  {name:'Paprika',     emoji:'🌶️',typ:'Gemüse',color:COLORS[5],anbauMonate:[2,3,4], ernteMonate:[7,8,9,10], pflege:'Vorkultur ab Feb, warm & sonnig, Königsblüte entfernen', pflanzenProQm:3,  zellenBedarf:4},
-  {name:'Gurke',      emoji:'🥒',typ:'Gemüse',color:COLORS[2],anbauMonate:[3,4,5], ernteMonate:[7,8,9,10], pflege:'Nach Eisheiligen pflanzen, Rankhilfe, viel Wasser',       pflanzenProQm:2,  zellenBedarf:4},
-  {name:'Erbsen',     emoji:'🫛',typ:'Gemüse',color:COLORS[9],anbauMonate:[3,4,5,6],ernteMonate:[6,7,8,9],  pflege:'Direktsaat, Kletterhilfe bei Stangen-erbsen',           pflanzenProQm:40, zellenBedarf:1},
-  {name:'Petersilie', emoji:'🍃',typ:'Kräuter',color:COLORS[7],anbauMonate:[3,4,5], ernteMonate:[5,6,7,8,9],pflege:'Gleichmäßig feucht, Keimung 3–4 Wochen, jährlich neu säen',pflanzenProQm:25, zellenBedarf:1},
-  {name:'Schnittlauch',emoji:'🌱',typ:'Kräuter',color:COLORS[7],anbauMonate:[3,4,5,6,7,8],ernteMonate:[4,5,6,7,8,9,10],pflege:'Regelmäßig schneiden, feucht halten, vor Blüte ernten',pflanzenProQm:16, zellenBedarf:1},
-  {name:'Dill',       emoji:'🌿',typ:'Kräuter',color:COLORS[7],anbauMonate:[4,5,6,7,8],ernteMonate:[6,7,8,9], pflege:'Sonnig, Blätter jung ernten, alle 3 Wo nachsäen möglich', pflanzenProQm:16, zellenBedarf:1},
-  {name:'Kresse',     emoji:'🌱',typ:'Kräuter',color:COLORS[6],anbauMonate:[3,4,5,6,7,8,9],ernteMonate:[4,5,6,7,8,9,10],pflege:'Feucht halten, schattig, Ernte nach 1–2 Wo möglich', pflanzenProQm:200,zellenBedarf:1},
-  {name:'Kopfsalat',  emoji:'🥬',typ:'Gemüse',color:COLORS[4],anbauMonate:[2,3,4,5,8,9,10],ernteMonate:[4,5,6,7,8,9,10,11],pflege:'Flach säen (ca. 1 cm), 25–30 cm Abstand, 5–7 Wo bis Ernte', pflanzenProQm:9,  zellenBedarf:1},
-  {name:'Feldsalat',  emoji:'🥗',typ:'Gemüse',color:COLORS[6],anbauMonate:[2,3,7,8,9], ernteMonate:[4,5,6,9,10,11,1], pflege:'Winterhart, sonnig bis halbschattig, lockeren Boden, 8 Wo bis Ernte', pflanzenProQm:20, zellenBedarf:1},
+  // Tomaten: ungünstige Nachbarn (Mischkultur)
+  {name:'Tomaten',    emoji:'🍅',typ:'Gemüse',color:COLORS[0],anbauMonate:[1,2,3],  ernteMonate:[6,7,8,9],  pflege:'Vorkultur Mitte Feb–Mitte Apr, Pflanzung Ende Mai. 60×40 cm. Sonnig, windgeschützt. Buschtomate: Seitentriebe nicht ausbrechen.', pflanzenProQm:2,  zellenBedarf:24, nichtNachbarn:['Gurke','Erbsen','Radieschen']},
+  {name:'Karotten',   emoji:'🥕',typ:'Gemüse',color:COLORS[1],anbauMonate:[2,3,4], ernteMonate:[6,7,8],   pflege:'Vereinzeln bei 3cm',        pflanzenProQm:100,zellenBedarf:1, nichtNachbarn:['Dill']},
+  {name:'Basilikum',  emoji:'🌿',typ:'Kräuter',color:COLORS[7],anbauMonate:[2,3],   ernteMonate:[5,6,7,8,9],pflege:'Aussaat März–April 0,5 cm tief. 15×20 cm. Keimung 10–14 d bei 18–25 °C. Sonnig.', pflanzenProQm:33, zellenBedarf:1, nichtNachbarn:['Dill']},
+  {name:'Zucchini',   emoji:'🥒',typ:'Gemüse',color:COLORS[2],anbauMonate:[3,4,5],   ernteMonate:[6,7,8,9],  pflege:'Vorkultur ab Mitte Apr, Freiland ab Mitte Mai. 2–3 cm tief, 100×80 cm. Sonnig, warm, nährstoffreicher Humusboden. Frostempfindlich.', pflanzenProQm:1,  zellenBedarf:80, nichtNachbarn:['Kürbis','Gurke','Tomaten','Paprika']},
+  {name:'Erdbeeren',  emoji:'🍓',typ:'Obst',  color:COLORS[3],anbauMonate:[2,3,9],  ernteMonate:[5,6,7],   pflege:'Ausläufer entfernen',       pflanzenProQm:4,  zellenBedarf:1, nichtNachbarn:[]},
+  {name:'Kürbis',     emoji:'🎃',typ:'Gemüse',color:COLORS[1],anbauMonate:[4,5],   ernteMonate:[9,10],     pflege:'Ranken führen, viel Platz', pflanzenProQm:1,  zellenBedarf:12, nichtNachbarn:['Zucchini','Gurke']},
+  {name:'Radieschen', emoji:'🌰',typ:'Gemüse',color:COLORS[8],anbauMonate:[2,3,4,8],ernteMonate:[4,5,6,9,10],pflege:'Locker säen, dünn halten',pflanzenProQm:120,zellenBedarf:1, nichtNachbarn:['Tomaten']},
+  {name:'Chicoree Etardo',emoji:'🥗',typ:'Gemüse',color:COLORS[6],anbauMonate:[4,8,9],ernteMonate:[9,10,11],pflege:'Saattiefe 1cm, Reihenabstand 40cm, Pflanzenabstand 10cm. Keimfähigkeit 83%.',pflanzenProQm:10,zellenBedarf:4, nichtNachbarn:[]},
+  {name:'Paprika',     emoji:'🌶️',typ:'Gemüse',color:COLORS[5],anbauMonate:[2,3,4], ernteMonate:[7,8,9,10], pflege:'Vorkultur ab Feb, warm & sonnig, Königsblüte entfernen', pflanzenProQm:3,  zellenBedarf:4, nichtNachbarn:['Tomaten','Erbsen','Zucchini','Kürbis']},
+  {name:'Gurke',      emoji:'🥒',typ:'Gemüse',color:COLORS[2],anbauMonate:[2,3,4,5], ernteMonate:[5,6,7,8], pflege:'Aussaat Mär–Mai im Warmen, Freiland Ende Mai–Jun. 1–2 cm tief, mind. 30×100 cm. Sonnig bis halbschattig, windgeschützt. Rankhilfe.', pflanzenProQm:3,  zellenBedarf:30, nichtNachbarn:['Tomaten']},
+  {name:'Erbsen',     emoji:'🫛',typ:'Gemüse',color:COLORS[9],anbauMonate:[3,4,5],ernteMonate:[5,6,7],  pflege:'In abgetrocknetem Boden 3–4 cm tief. Reihen 25–30 cm, Kornabstand 5–6 cm. Bei 10 cm Höhe anhäufeln. Sonnig, durchlässiger Boden. Fruchtfolge: Stickstoff für Folgekulturen.', pflanzenProQm:50, zellenBedarf:1, nichtNachbarn:['Paprika']},
+  {name:'Petersilie', emoji:'🍃',typ:'Kräuter',color:COLORS[7],anbauMonate:[2,3,4,5,6], ernteMonate:[3,4,5,6,7,8,9],pflege:'0,5–1 cm tief, Reihen 20 cm, in Reihe mind. 10 cm. Keimung 15–30 d bei 15–20 °C. Halbschattig bis sonnig. Zweijährig.', pflanzenProQm:50, zellenBedarf:1, nichtNachbarn:[]},
+  {name:'Schnittlauch',emoji:'🌱',typ:'Kräuter',color:COLORS[7],anbauMonate:[2,3,4,5,6,7],ernteMonate:[3,4,5,6,7,8,9,10],pflege:'30×20 cm. Sonnig bis halbschattig, lockerer humoser Boden. Keimung 10–26 d bei 10–15 °C (Kaltkeimer). Nicht zu tief schneiden (ca. 5 cm stehen lassen).', pflanzenProQm:17, zellenBedarf:1, nichtNachbarn:[]},
+  {name:'Dill',       emoji:'🌿',typ:'Kräuter',color:COLORS[7],anbauMonate:[3,4,5,6,7],ernteMonate:[4,5,6,7,8,9], pflege:'1 cm tief, sonnig. 25×10 cm. Keimung 14–20 d bei 15–20 °C. Blätter jung ernten, zum Tiefgefrieren geeignet.', pflanzenProQm:40, zellenBedarf:1, nichtNachbarn:['Basilikum','Kresse','Karotten']},
+  {name:'Kresse',     emoji:'🌱',typ:'Kräuter',color:COLORS[6],anbauMonate:[3,4,5,6,7,8],ernteMonate:[4,5,6,7,8,9,10],pflege:'Nicht mit Erde bedecken, von unten gießen. Keimung 3–5 d bei 15–20 °C. Nachsaat alle 2–3 Wo für durchgehende Ernte. Hell.', pflanzenProQm:200,zellenBedarf:1, nichtNachbarn:['Dill']},
+  {name:'Kopfsalat',  emoji:'🥬',typ:'Gemüse',color:COLORS[4],anbauMonate:[2,3,4,5,6,7],ernteMonate:[4,5,6,7,8],pflege:'0,5–1 cm tief, ab Mitte Apr auf 30×25 cm. Keimung 7–14 d bei 10–18 °C. Sonnig, nährstoffreich. Hitzefeste Sommersorte.', pflanzenProQm:13,  zellenBedarf:1, nichtNachbarn:[]},
+  {name:'Feldsalat',  emoji:'🥗',typ:'Gemüse',color:COLORS[6],anbauMonate:[7,8], ernteMonate:[9,10,11], pflege:'1–2 cm tief, Reihen 10–15 cm. Keimung 14–21 d bei 3–18 °C (Kaltkeimer). Sonnig, humos, kalkhaltig, sandiger Lehm. Nicht winterhart.', pflanzenProQm:70, zellenBedarf:1, nichtNachbarn:[]},
 ];
 function seed(){
   if (S.pflanzen.length === 0) {
@@ -771,6 +794,19 @@ function renderCanvas(b,month){
       const totalPflanzen=plantsFromArea(pl.rows,pl.cols,pfl.pflanzenProQm);
       const showLabel=Math.min(w,h)>CPIX*1.5;
       const showCount=Math.min(w,h)>CPIX*0.9; // show count chip if tile is big enough
+      const nichtNachbarn=pfl.nichtNachbarn||(SEED_PFLANZEN.find(s=>s.name===pfl.name)?.nichtNachbarn)||[];
+      const nachbarnLine=Array.isArray(nichtNachbarn)&&nichtNachbarn.length?`<br>⚠️ Nicht neben: ${nichtNachbarn.join(', ')}`:'';
+      let conflictNames=[];
+      if(Array.isArray(nichtNachbarn)&&nichtNachbarn.length&&b.placements){
+        b.placements.forEach(other=>{
+          if(other.id===pl.id)return;
+          if(other.von>pl.bis||other.bis<pl.von)return;
+          const opfl=S.pflanzen.find(x=>x.id===other.pflanzeId);
+          if(opfl&&nichtNachbarn.includes(opfl.name)&&!conflictNames.includes(opfl.name)) conflictNames.push(opfl.name);
+        });
+      }
+      const conflictLine=conflictNames.length?`<br>⚠️ Im Beet: ${conflictNames.join(', ')} (ungünstig)`:'';
+      const tooltipHtml=`${pfl.emoji} ${pfl.name}<br>${MN[pl.von]}–${MN[pl.bis]} · ${aufgabe}<br>🌱 ${totalPflanzen} Pflanze${totalPflanzen!==1?'n':''} · 📐 ${pl.cols*10}×${pl.rows*10} cm${nachbarnLine}${conflictLine}`;
       tile.innerHTML=`
         <div class="ptile-inner">
           <span class="ptile-emoji" style="font-size:${emojiSize}">${pfl.emoji||'🌱'}</span>
@@ -778,9 +814,25 @@ function renderCanvas(b,month){
           <span class="ptile-badge ${BADGE[aufgabe]||'badge-care'}">${aufgabe[0]}</span>
           ${showCount?`<span class="ptile-count">${totalPflanzen}×</span>`:''}
         </div>
-        <div class="ptile-tooltip">${pfl.emoji} ${pfl.name}<br>${MN[pl.von]}–${MN[pl.bis]} · ${aufgabe}<br>🌱 ${totalPflanzen} Pflanze${totalPflanzen!==1?'n':''} · 📐 ${pl.cols*10}×${pl.rows*10} cm</div>
+        <div class="ptile-tooltip">${tooltipHtml}</div>
         <div class="ptile-resize" data-resize="${pl.id}" title="Größe ziehen"></div>
       `;
+
+      // Global tooltip on hover (fixed position so it is never clipped)
+      const gTip=document.getElementById('ptile-tooltip-global');
+      if(gTip){
+        tile.addEventListener('mouseenter',function(e){
+          gTip.innerHTML=tooltipHtml;
+          const rect=tile.getBoundingClientRect();
+          gTip.style.left=(rect.left+rect.width/2)+'px';
+          gTip.style.top=(rect.bottom+8)+'px';
+          gTip.style.transform='translateX(-50%)';
+          gTip.classList.add('is-visible');
+        });
+        tile.addEventListener('mouseleave',function(){
+          gTip.classList.remove('is-visible');
+        });
+      }
 
       // Delete button — inline confirm, no browser dialog
       const delBtn = document.createElement('div');
@@ -1255,6 +1307,7 @@ function renderPflanzen(){
           <span><span style="display:inline-block;width:8px;height:8px;background:var(--amber);border-radius:2px;margin-right:3px"></span>Ernte</span>
         </div>
       </div>
+      ${Array.isArray(p.nichtNachbarn)&&p.nichtNachbarn.length?`<div style="font-size:.72rem;color:var(--ink2);border-top:1px solid var(--border);padding-top:6px;margin-top:6px">⚠️ Nicht neben: ${p.nichtNachbarn.join(', ')}</div>`:''}
       ${p.pflege?`<div style="font-size:.78rem;color:var(--ink2);border-top:1px solid var(--border);padding-top:8px">💧 ${p.pflege}</div>`:''}
     </div>`).join('');
 }
